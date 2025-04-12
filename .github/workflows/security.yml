@@ -1,20 +1,10 @@
-name: Security Scan
-
-on:
-  push:
-    branches:
-      - main
-      - Dev
-  pull_request:
-    branches:
-      - main
-      - Dev
+permissions:
+  security-events: write  # Permissão para gravar eventos de segurança
+  actions: read  # Permissão para ler ações do repositório
 
 jobs:
   security:
-    name: Security Scan
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
@@ -28,29 +18,25 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install bandit
 
-      # ================================
-      # Rodar o Bandit e gerar o arquivo JSON
-      # ================================
       - name: Run Bandit
         run: |
           bandit -r . -f json -o bandit.json || true
 
-      # ================================
-      # Converter JSON do Bandit para SARIF
-      # ================================
+      - name: Check Bandit JSON output
+        run: cat bandit.json
+
       - name: Run Bandit to SARIF conversion
         run: |
           python scripts/bandit_to_sarif.py
 
-      # ================================
-      # Fazer o upload dos resultados SARIF
-      # ================================
       - name: Upload Bandit SARIF
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: bandit-results.sarif
-
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Garantir que o token é passado corretamente
 
       - name: Start Django development server
         run: |
