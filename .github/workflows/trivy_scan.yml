@@ -11,7 +11,7 @@ on:
       - Dev
 
 permissions:
-  contents: read  # Permissão de leitura para o conteúdo do repositório
+  contents: read  # Permissão para acessar o conteúdo do repositório
   security-events: write  # Permissão para enviar eventos de segurança
 
 jobs:
@@ -23,13 +23,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: Install Trivy
-        run: |
-          curl -sfL https://github.com/aquasecurity/trivy/releases/download/v0.20.0/trivy_0.20.0_Linux-x86_64.tar.gz | tar -xz -C /usr/local/bin
-
-      - name: Run Trivy vulnerability scan (in fs mode)
-        run: |
-          trivy fs . --format sarif --output trivy-results.sarif
+      - name: Run Trivy vulnerability scanner in fs mode
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          scan-type: 'fs'         # Modo fs (sistema de arquivos)
+          scan-ref: '.'           # Escaneia o diretório atual
 
       - name: Upload Trivy SARIF results to GitHub
         uses: github/codeql-action/upload-sarif@v3
