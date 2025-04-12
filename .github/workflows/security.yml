@@ -3,8 +3,12 @@ name: Security Scan
 on:
   push:
     branches:
-      - main  # Altere para o nome da branch principal do seu repositório
-      - Dev  # Altere para o nome da branch principal do seu repositório
+      - main
+      - Dev
+  pull_request:
+    branches:
+      - main
+      - Dev
 
 jobs:
   security:
@@ -18,34 +22,49 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
-          python-version: 3.9  # Altere para a versão do Python que você está usando
-      - name: Debug SECRET_KEY
-        run: echo ${{ secrets.secret }}
+          python-version: 3.9
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requeriments.txt  # Altere para o nome do seu arquivo requeriments.txt, se necessário
-      - name: Run Trivy vulnerability scanner in fs mode
-              uses: aquasecurity/trivy-action@0.20.0
-              with:
-                  scan-type: 'fs'
-                  scan-ref: '.'
-                  format: 'sarif'
-                  output: 'trivy-results.sarif'
-      - name: Run Bandit
+          pip install -r requeriments.txt
+
+      # =============================
+      # Run Trivy and export SARIF
+      # =============================
+      - name: Run Trivy (SARIF)
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      # =============================
+      # Run Bandit and export SARIF
+      # =============================
+      - name: Install Bandit and SARIF converter
         run: |
-          pip install bandit
+          pip install bandit bandit-sarif
+
+      - name: Run Bandit and convert to SARIF
+        run: |
           bandit -r . -f json -o bandit.json
           bandit-sarif bandit.json > bandit-results.sarif
+
+      # =============================
+      # Upload SARIF results to GitHub Code Scanning
+      # =============================
       - name: Upload Trivy SARIF
         uses: github/codeql-action/upload-sarif@v2
-          with:
-            sarif_file: trivy-results.sarif
+        with:
+          sarif_file: trivy-results.sarif
 
       - name: Upload Bandit SARIF
         uses: github/codeql-action/upload-sarif@v2
-          with:
-            sarif_file: bandit-results.sarif
+        with:
+          sarif_file: bandit-results.sarif
+
       - name: Start Django development server
         run: |
           export SECRET_KEY=${{ secrets.secret }}
