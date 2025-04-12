@@ -27,8 +27,12 @@ jobs:
         uses: aquasecurity/trivy-action@0.20.0
         with:
           scan-type: 'fs'         # Modo fs (sistema de arquivos)
-          scan-ref: '.'           # Escaneia o diretório atual
-          output: trivy-results.sarif  # Gera o arquivo SARIF
+          scan-ref: 'requirements.txt'           # Escaneia o diretório atual
+          severity: 'HIGH,CRITICAL'
+          exit-code: '1'
+          format: 'sarif'
+          limit-severities-for-sarif: false
+          output: 'trivy-results.sarif'
 
 
       - name: Upload Trivy SARIF results to GitHub
