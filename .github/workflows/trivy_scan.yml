@@ -1,0 +1,38 @@
+name: Security Scan with Trivy
+
+on:
+  push:
+    branches:
+      - main
+      - Dev
+  pull_request:
+    branches:
+      - main
+      - Dev
+
+permissions:
+  contents: read  # Permissão de leitura para o conteúdo do repositório
+  security-events: write  # Permissão para enviar eventos de segurança
+
+jobs:
+  security:
+    name: Trivy Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Install Trivy
+        run: |
+          curl -sfL https://github.com/aquasecurity/trivy/releases/download/v0.20.0/trivy_0.20.0_Linux-x86_64.tar.gz | tar -xz -C /usr/local/bin
+
+      - name: Run Trivy vulnerability scan (in fs mode)
+        run: |
+          trivy fs . --format sarif --output trivy-results.sarif
+
+      - name: Upload Trivy SARIF results to GitHub
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+          wait-for-processing: true
