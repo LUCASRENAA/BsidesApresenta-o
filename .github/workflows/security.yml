@@ -47,10 +47,11 @@ jobs:
         run: |
           pip install bandit bandit-sarif
 
-      - name: Run Bandit and convert to SARIF
+      - name: Run Bandit and generate SARIF
         run: |
           bandit -r . -f json -o bandit.json
-          bandit-sarif bandit.json > bandit-results.sarif
+          python scripts/bandit_to_sarif.py
+
 
       # =============================
       # Upload SARIF results to GitHub Code Scanning
