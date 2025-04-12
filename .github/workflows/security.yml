@@ -27,44 +27,30 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requeriments.txt
+          pip install -r requirements.txt
 
-      # =============================
-      # Run Trivy and export SARIF
-      # =============================
-      - name: Run Trivy (SARIF)
-        uses: aquasecurity/trivy-action@0.20.0
-        with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-
-      # =============================
-      # Run Bandit and export SARIF
-      # =============================
-      - name: Install Bandit and SARIF converter
-        run: |
-          pip install bandit bandit-sarif
-
-      - name: Run Bandit and generate SARIF
+      # ================================
+      # Rodar o Bandit e gerar o arquivo JSON
+      # ================================
+      - name: Run Bandit
         run: |
           bandit -r . -f json -o bandit.json
+
+      # ================================
+      # Converter JSON do Bandit para SARIF
+      # ================================
+      - name: Run Bandit to SARIF conversion
+        run: |
           python scripts/bandit_to_sarif.py
 
-
-      # =============================
-      # Upload SARIF results to GitHub Code Scanning
-      # =============================
-      - name: Upload Trivy SARIF
-        uses: github/codeql-action/upload-sarif@v2
-        with:
-          sarif_file: trivy-results.sarif
-
+      # ================================
+      # Fazer o upload dos resultados SARIF
+      # ================================
       - name: Upload Bandit SARIF
         uses: github/codeql-action/upload-sarif@v2
         with:
           sarif_file: bandit-results.sarif
+
 
       - name: Start Django development server
         run: |

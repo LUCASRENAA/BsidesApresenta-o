@@ -1,6 +1,17 @@
-django
-djangorestframework
-markdown
-django-filter
-djangorestframework-simplejwt
-django-cors-headers
+# Django com CVE-2022-34265, CVE-2021-44420
+django==2.2.28
+
+# djangorestframework com CVE-2021-28359
+djangorestframework==3.11.1
+
+# markdown com CVE-2019-20477
+markdown==3.1.1
+
+# django-filter com CVE-2020-15257
+django-filter==2.2.0
+
+# djangorestframework-simplejwt com possíveis riscos em versões antigas
+djangorestframework-simplejwt==4.3.0
+
+# django-cors-headers com CSRF bypass histórico em versões < 3.4.0
+django-cors-headers==3.2.1
