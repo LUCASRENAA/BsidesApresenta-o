@@ -102,20 +102,20 @@ jobs:
 
       # ---------------------- Enviar os arquivos SARIF para o TinyLlama ----------------------
       - name: Enviar resultados Trivy para TinyLlama
-      run: |
-        trivy_results=$(cat trivy-results.sarif)
-        response=$(curl -s -X POST http://localhost:11399/api/generate \
-          -H "Content-Type: application/json" \
-          -d "{\"model\": \"tinyllama\", \"prompt\": \"Aqui estão os resultados do Trivy em formato SARIF. Analise e forneça um resumo e recomendações de segurança: $trivy_results\", \"stream\": false}")
-        echo "$response" | jq -r '.response'
+        run: |
+          trivy_results=$(cat trivy-results.sarif)
+          response=$(curl -s -X POST http://localhost:11399/api/generate \
+            -H "Content-Type: application/json" \
+            -d "{\"model\": \"tinyllama\", \"prompt\": \"Aqui estão os resultados do Trivy em formato SARIF. Analise e forneça um resumo e recomendações de segurança: $trivy_results\", \"stream\": false}")
+          echo "$response" | jq -r '.response'
 
-    - name: Enviar resultados Bandit para TinyLlama
-      run: |
-        bandit_results=$(cat bandit-results.sarif)
-        response=$(curl -s -X POST http://localhost:11399/api/generate \
-          -H "Content-Type: application/json" \
-          -d "{\"model\": \"tinyllama\", \"prompt\": \"Aqui estão os resultados do Bandit em formato SARIF. Analise e forneça um resumo e recomendações de segurança: $bandit_results\", \"stream\": false}")
-        echo "$response" | jq -r '.response'
+      - name: Enviar resultados Bandit para TinyLlama
+        run: |
+          bandit_results=$(cat bandit-results.sarif)
+          response=$(curl -s -X POST http://localhost:11399/api/generate \
+            -H "Content-Type: application/json" \
+            -d "{\"model\": \"tinyllama\", \"prompt\": \"Aqui estão os resultados do Bandit em formato SARIF. Analise e forneça um resumo e recomendações de segurança: $bandit_results\", \"stream\": false}")
+          echo "$response" | jq -r '.response'
 
       - name: Parar Containers
         run: |
