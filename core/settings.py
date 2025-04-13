@@ -79,6 +79,8 @@ DATABASES = {
         'NAME': str(BASE_DIR / 'db.sqlite3'),
     }
 }
+username_token = "admin"
+password_token = "admin"
 
 
 # Password validation
