@@ -128,9 +128,7 @@ jobs:
                 echo "🔍 Exibindo conteúdo do PR Diff:"
                 cat pr.diff  # Exibe o conteúdo do diff para diagnóstico
                 echo "🧠 Resultado da IA: $result"
-                
-
-               
+              
               fi
 
                       
