@@ -100,7 +100,6 @@ jobs:
       - name: Aguardar containers subirem
         run: |
           sleep 15  # Aguarda 15 segundos para garantir que o Ollama esteja inicializado
-          
 
      - name: Enviar resultados Trivy para TinyLlama
         run: |
