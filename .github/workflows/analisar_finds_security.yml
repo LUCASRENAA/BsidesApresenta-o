@@ -115,7 +115,7 @@ jobs:
 
               echo "🔍 Enviando prompt para o TinyLlama: $formatted_prompt"
 
-              response=$(curl -s -X POST http://localhost:11434/api/generate \
+              response=$(curl -s -X POST http://localhost:11399/api/generate \
                 -H "Content-Type: application/json" \
                 -d "{\"model\": \"tinyllama\", \"stream\": false, \"prompt\": \"$formatted_prompt\"}")
 
