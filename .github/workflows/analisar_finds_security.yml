@@ -156,7 +156,7 @@ jobs:
                   EOF
                   )
 
-                  # Escapar com jq
+                  # Escapar com jq para evitar problemas de JSON malformado
                   escaped_body=$(printf '%s' "$comment_body" | jq -Rs .)
 
                   curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
@@ -164,8 +164,7 @@ jobs:
                       -X POST \
                       -d "{\"body\": $escaped_body}" \
                       "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments"
-                                  
-                fi
+
               
             done
           }
