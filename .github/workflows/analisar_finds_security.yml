@@ -115,21 +115,21 @@ jobs:
 
               echo "🔍 Enviando prompt para o TinyLlama: $formatted_prompt"
               # Escapar o prompt usando jq
-              escaped_prompt=$(jq -R <<< "$formatted_prompt" | jq -s .)
+              # Escapar o prompt corretamente como string
+              escaped_prompt=$(jq -Rs <<< "$formatted_prompt")
 
-              response=$(curl -s -X POST http://localhost:11399/api/generate \
+              response=$(curl -s -X POST http://localhost:11434/api/generate \
                 -H "Content-Type: application/json" \
                 -d "{\"model\": \"tinyllama\", \"stream\": false, \"prompt\": $escaped_prompt}" || echo "erro")
 
               result=$(echo "$response" | jq -r '.response // .error')
 
-              echo "Resposta da IA: $response"
-
-              if [ "$result" == "null" ]; then
+              if [ "$result" == "null" ] || [ "$result" == "erro" ]; then
                 echo "⚠️ Erro na resposta da IA: $response"
               else
                 echo "🧠 Resultado da IA: $result"
               fi
+
             done
           }
 
