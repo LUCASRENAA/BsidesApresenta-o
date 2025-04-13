@@ -130,7 +130,7 @@ jobs:
           if [ -f "bandit-results.sarif" ]; then
             echo "📄 Arquivo bandit-results.sarif encontrado. Enviando para análise com TinyLlama..."
             
-            prompt=$(jq -Rs --arg prefix "Aqui estão os resultados do Bandit em formato SARIF. Analise e forneça um resumo e recomendações de segurança: " '$prefix + .' < bandit-results.sarif)
+            prompt=$(jq -Rs --arg prefix "You are a security analyst. Here are the Bandit scan results in SARIF format. Please review the findings and provide a security-focused summary along with specific recommendations or mitigations. Indicate whether each finding is valid or a false positive: " '$prefix + .' < bandit-results.sarif)
 
             response=$(curl -s -X POST http://localhost:11399/api/generate \
               -H "Content-Type: application/json" \

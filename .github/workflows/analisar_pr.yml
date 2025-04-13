@@ -1,0 +1,70 @@
+name: Analyze PR Diff with TinyLlama
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  security-review:
+    name: Revisar mudanças do PR com TinyLlama
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repositório
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 2  # necessário para comparar as mudanças
+
+      - name: Instalar Docker e dependências
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker.io jq curl
+
+      - name: Subir ambiente TinyLlama (via Ollama)
+        run: |
+          docker run -d --name ollama -p 11434:11434 ollama/ollama
+          sleep 10
+          docker exec ollama ollama pull tinyllama
+
+      - name: Obter o diff do PR
+        id: diff
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          git diff origin/${{ github.base_ref }} > pr.diff
+          echo "Diff obtido:"
+          cat pr.diff
+
+      - name: Analisar mudanças com TinyLlama
+        id: analysis
+        run: |
+          patch=$(jq -Rs . < pr.diff)
+          prompt="Analise as seguintes mudanças de código e avalie se há problemas de segurança ou boas práticas sendo violadas. Dê sugestões específicas: ${patch}"
+
+          response=$(curl -s -X POST http://localhost:11434/api/generate \
+            -H "Content-Type: application/json" \
+            -d "{\"model\": \"tinyllama\", \"prompt\": $patch, \"stream\": false}")
+
+          echo "Resultado:"
+          echo "$response" | jq
+
+          summary=$(echo "$response" | jq -r '.response // .error')
+          echo "summary<<EOF" >> $GITHUB_OUTPUT
+          echo "$summary" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Comentar no PR
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          COMMENT_BODY="### 🤖 TinyLlama Security Review\n\n${{ steps.analysis.outputs.summary }}"
+          
+          curl -s -X POST \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"body\": \"$COMMENT_BODY\"}" \
+            "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments"

@@ -1,0 +1,87 @@
+name: Analyze GitHub Security Findings
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main, Dev]
+
+permissions:
+  contents: read
+  security-events: read  # necessário para acessar findings via API
+
+jobs:
+  analyze-findings:
+    name: Analisar Findings de Segurança com TinyLlama
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Instalar Docker e dependências
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker.io jq curl
+
+      - name: Subir ambiente TinyLlama com Ollama
+        run: |
+          docker run -d --name ollama -p 11434:11434 ollama/ollama
+          sleep 15  # tempo para subir a API
+          docker exec ollama ollama pull tinyllama
+
+      - name: Baixar findings do GitHub Security
+        run: |
+          mkdir -p findings
+
+          echo "🔍 Baixando Code Scanning..."
+          curl -s -H "Authorization: token ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/${{ github.repository }}/code-scanning/alerts \
+            -o findings/code-scanning.json
+
+          echo "🔐 Baixando Secret Scanning..."
+          curl -s -H "Authorization: token ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/${{ github.repository }}/secret-scanning/alerts \
+            -o findings/secrets.json
+
+          echo "📦 Baixando Dependabot..."
+          curl -s -H "Authorization: token ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/${{ github.repository }}/dependabot/alerts \
+            -o findings/dependabot.json
+
+      - name: Analisar cada finding com TinyLlama
+        run: |
+          analyze_findings() {
+            local type="$1"
+            local file="findings/${type}.json"
+
+            echo "🔎 Analisando findings de ${type}..."
+            count=$(jq length "$file")
+
+            if [ "$count" -eq 0 ]; then
+              echo "✅ Nenhum finding de ${type} encontrado."
+              return
+            fi
+
+            for i in $(seq 0 $(($count - 1))); do
+              finding=$(jq -c ".[$i]" "$file")
+              prompt=$(jq -Rn --arg data "$finding" --arg type "$type" \
+                '$type + " finding: " + $data')
+
+              echo "📤 Enviando para análise..."
+              response=$(curl -s -X POST http://localhost:11434/api/generate \
+                -H "Content-Type: application/json" \
+                -d "{\"model\": \"tinyllama\", \"prompt\": $prompt, \"stream\": false}")
+
+              echo "🧠 Resultado da IA (Finding $i):"
+              echo "$response" | jq -r '.response // .error'
+              echo "---"
+            done
+          }
+
+          analyze_findings "code-scanning"
+          analyze_findings "secrets"
+          analyze_findings "dependabot"
+
+      - name: Parar ambiente TinyLlama
+        run: |
+          docker stop ollama && docker rm ollama
