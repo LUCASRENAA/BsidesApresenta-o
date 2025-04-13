@@ -69,24 +69,40 @@ jobs:
         id: analysis
         run: |
           # Ler o conteúdo do diff e formatá-lo como string
-          patch=$(cat pr.diff | jq -Rs .)  # Usando `jq -Rs` para tratar o diff como string
+          echo "🔍 Exibindo conteúdo do PR Diff:"
+          cat pr.diff  # Exibe o conteúdo do diff para diagnóstico
+
+          # Escapar as quebras de linha e as aspas duplas para garantir que seja uma string válida em JSON
+          patch=$(cat pr.diff | jq -Rs .)  # Usa o `jq -Rs` para tratar o diff como string, escapando quebras de linha e aspas
+          
+          echo "🔍 Diff formatado como string (escapando quebras de linha e aspas):"
+          echo "$patch"  # Exibe o patch formatado para diagnóstico
 
           # Criar o prompt para o TinyLlama
           prompt=$(jq -n --arg txt "Analyze the following code diff as a security analyst. Identify any potential security issues or bad practices, and suggest improvements:\n" --arg diff "$patch" '$txt + $diff')
+          
+          echo "🔍 Prompt gerado para o TinyLlama:"
+          echo "$prompt"  # Exibe o prompt para garantir que está correto
 
           # Enviar para análise
+          echo "📤 Enviando para a API do TinyLlama..."
           response=$(curl -s -X POST http://localhost:11434/api/generate \
             -H "Content-Type: application/json" \
             -d "{\"model\": \"tinyllama\", \"stream\": false, \"prompt\": $prompt}")
 
-          echo "Resultado:"
-          echo "$response" | jq
+          echo "📥 Resposta da API:"
+          echo "$response" | jq  # Exibe a resposta da API
 
           # Obter o resumo da resposta ou erro
           summary=$(echo "$response" | jq -r '.response // .error')
+          echo "🔑 Resumo da análise:"
+          echo "$summary"
+
+          # Passar o resumo para o GitHub output
           echo "summary<<EOF" >> $GITHUB_OUTPUT
           echo "$summary" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
+
 
       - name: Comentar no PR
         if: github.event_name == 'pull_request'

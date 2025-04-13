@@ -80,43 +80,56 @@ jobs:
 
       - name: Analisar cada finding com TinyLlama
         run: |
-            analyze_findings() {
-              local type="$1"
-              local file="findings/${type}.json"
+          analyze_findings() {
+            local type="$1"
+            local file="findings/${type}.json"
 
-              echo "🔎 Analisando findings de ${type}..."
-              count=$(jq length "$file")
+            echo "🔎 Analisando findings de ${type}..."
+            count=$(jq length "$file")
 
-              if [ "$count" -eq 0 ]; then
-                echo "✅ Nenhum finding de ${type} encontrado."
-                return
+            if [ "$count" -eq 0 ]; then
+              echo "✅ Nenhum finding de ${type} encontrado."
+              return
+            fi
+
+            for i in $(seq 0 $(($count - 1))); do
+              # Obter o finding atual
+              finding=$(jq -c ".[$i]" "$file")
+
+              # Escapar qualquer caractere especial no finding
+              escaped_finding=$(echo "$finding" | jq -Rs .)
+
+              # Criar o prompt
+              prompt=$(jq -n --arg data "$escaped_finding" --arg type "$type" \
+                '$type + " finding: " + $data')
+
+              echo "📤 Enviando para análise..."
+              
+              # Exibir o conteúdo do prompt para garantir que está correto
+              echo "🔍 Prompt gerado para o TinyLlama (Finding $i):"
+              echo "$prompt"
+
+              # Enviar para análise
+              response=$(curl -s -X POST http://localhost:11434/api/generate \
+                -H "Content-Type: application/json" \
+                -d "{\"model\": \"tinyllama\", \"stream\": false, \"prompt\": $prompt}")
+
+              # Verificar se a resposta tem o campo 'response'
+              result=$(echo "$response" | jq -r '.response // .error')
+
+              if [ "$result" == "null" ]; then
+                echo "⚠️ Erro na resposta da IA (Finding $i): $response"
+              else
+                echo "🧠 Resultado da IA (Finding $i): $result"
               fi
+              echo "---"
+            done
+          }
 
-              for i in $(seq 0 $(($count - 1))); do
-                finding=$(jq -c ".[$i]" "$file")
-                prompt=$(jq -Rn --arg data "$finding" --arg type "$type" \
-                  '$type + " finding: " + $data')
+          analyze_findings "code-scanning"
+          analyze_findings "secrets"
+          analyze_findings "dependabot"
 
-                echo "📤 Enviando para análise..."
-                response=$(curl -s -X POST http://localhost:11434/api/generate \
-                  -H "Content-Type: application/json" \
-                  -d "{\"model\": \"tinyllama\", \"stream\": false, \"prompt\": $prompt}")
-
-                # Verificar se a resposta tem o campo 'response'
-                result=$(echo "$response" | jq -r '.response // .error')
-
-                if [ "$result" == "null" ]; then
-                  echo "⚠️ Erro na resposta da IA (Finding $i): $response"
-                else
-                  echo "🧠 Resultado da IA (Finding $i): $result"
-                fi
-                echo "---"
-              done
-            }
-
-            analyze_findings "code-scanning"
-            analyze_findings "secrets"
-            analyze_findings "dependabot"
 
       - name: Parar ambiente TinyLlama
         run: |
