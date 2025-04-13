@@ -5,13 +5,14 @@ on:
     branches:
       - main
       - Dev
-  pull_request:
+  pull_request_target:
     branches:
       - main
       - Dev
 
 permissions:
   contents: read
+  pull-requests: write
   security-events: read
 
 jobs:
@@ -20,8 +21,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repositório com segurança
         uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
 
       - name: Remover versões conflitantes do Docker
         run: |
@@ -54,27 +58,23 @@ jobs:
         run: |
           mkdir -p findings
 
-          echo "🔍 Baixando Code Scanning..."
-          curl -s -H "Authorization: token ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}" \
+          curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             https://api.github.com/repos/${{ github.repository }}/code-scanning/alerts \
             -o findings/code-scanning.json
 
-          echo "🔐 Baixando Secret Scanning..."
-          curl -s -H "Authorization: token ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}" \
+          curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             https://api.github.com/repos/${{ github.repository }}/secret-scanning/alerts \
             -o findings/secrets.json || echo "Erro ao baixar Secret Scanning"
 
-          echo "📦 Baixando Dependabot..."
-          curl -s -H "Authorization: token ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}" \
+          curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             https://api.github.com/repos/${{ github.repository }}/dependabot/alerts \
             -o findings/dependabot.json || echo "Erro ao baixar Dependabot"
 
-      - name: Analisar cada finding com TinyLlama
+      - name: Analisar findings com TinyLlama
         run: |
           analyze_findings() {
             local type="$1"
             local file="findings/${type}.json"
-
             echo "🔎 Analisando findings de ${type}..."
             count=$(jq length "$file")
 
@@ -97,7 +97,7 @@ jobs:
               html_url=$(echo "$finding" | jq -r '.html_url')
               help_uri=$(echo "$finding" | jq -r '.rule.help_uri')
 
-              formatted_prompt="A vulnerability was found in the repository. Below are the details:
+              prompt="A vulnerability was found in the repository. Below are the details:
 
               - Finding ID: $number
               - Created At: $created_at
@@ -113,11 +113,7 @@ jobs:
               For reference, here is the rule documentation: $help_uri  
               GitHub Finding Link: $html_url"
 
-
-              echo "🔍 Enviando prompt para o TinyLlama: $formatted_prompt"
-              # Escapar o prompt usando jq
-              # Escapar o prompt corretamente como string
-              escaped_prompt=$(jq -Rs <<< "$formatted_prompt")
+              escaped_prompt=$(jq -Rs <<< "$prompt")
 
               response=$(curl -s -X POST http://localhost:11399/api/generate \
                 -H "Content-Type: application/json" \
@@ -129,38 +125,30 @@ jobs:
                 echo "⚠️ Erro na resposta da IA: $response"
               else
                 echo "🧠 Resultado da IA: $result"
-                # Se estiver rodando num Pull Request, comente a resposta da IA
-                if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-                  comment_body="### 🤖 Análise Automática da TinyLlama
+
+                comment_body="### 🤖 TinyLlama Security Analysis
 
                 **Finding #$number**  
-                **Severidade:** $severity  
-                **Caminho:** \`$location_path:$location_line\`  
+                **Severity:** $severity  
+                **File:** \`$location_path:$location_line\`  
 
-                **Resultado da IA:**  
+                **AI Response:**  
                 $result
 
-                [🔗 Ver finding no GitHub]($html_url)
-                "
+                [🔗 View on GitHub]($html_url)"
 
-                  curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-                      -H "Content-Type: application/json" \
-                      -X POST \
-                      -d "{\"body\": \"$comment_body\"}" \
-                      "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments"
-                fi
-
+                curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                  -H "Content-Type: application/json" \
+                  -X POST \
+                  -d "{\"body\": \"$comment_body\"}" \
+                  "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments"
               fi
-
             done
           }
 
           analyze_findings "code-scanning"
-          echo "🧪 Tentando analisar secrets.json..."
-          ( analyze_findings "secrets" ) || echo "⚠️ Erro ao analisar findings de secrets ou arquivo inválido."
-
-          echo "🧪 Tentando analisar dependabot.json..."
-          ( analyze_findings "dependabot" ) || echo "⚠️ Erro ao analisar findings de dependabot ou arquivo inválido."
+          ( analyze_findings "secrets" ) || echo "⚠️ Erro ao analisar secrets.json"
+          ( analyze_findings "dependabot" ) || echo "⚠️ Erro ao analisar dependabot.json"
 
       - name: Parar ambiente TinyLlama
         run: |
