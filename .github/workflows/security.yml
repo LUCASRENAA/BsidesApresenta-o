@@ -112,7 +112,7 @@ jobs:
             # Faz a requisição
             response=$(curl -s -X POST http://localhost:11399/api/generate \
               -H "Content-Type: application/json" \
-              -d "{\"model\": \"tinyllama\", \"prompt\": ${prompt}, \"stream\": false}")
+              -d "{\"model\": \"tinyllama\", \"stream\": false, \"prompt\": ${prompt}}")
             
             echo "🧠 Resposta completa da API:"
             echo "$response" | jq
@@ -134,7 +134,7 @@ jobs:
 
             response=$(curl -s -X POST http://localhost:11399/api/generate \
               -H "Content-Type: application/json" \
-              -d "{\"model\": \"tinyllama\", \"prompt\": ${prompt}, \"stream\": false}")
+              -d "{\"model\": \"tinyllama\", \"stream\": false, \"prompt\": ${prompt}}")
 
             echo "🧠 Resposta completa da API:"
             echo "$response" | jq
