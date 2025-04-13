@@ -126,16 +126,12 @@ jobs:
                 echo "⚠️ Erro na resposta da IA: $response"
               else
                 echo "🧠 Resultado da IA: $result"
-                [🔗 Ver finding no GitHub]($html_url)
-                "
-
-                # Escapar o corpo do comentário com jq para garantir que é um JSON válido
-                escaped_body=$(jq -Rs <<< "$comment_body")
+                
 
                 curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
                     -H "Content-Type: application/json" \
                     -X POST \
-                    -d "{\"body\": $escaped_body}" \
+                    -d "{\"body\": $response}" \
                     "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments"
               fi
 
