@@ -125,6 +125,10 @@ jobs:
             echo "---"
           done
           }
+          # Chamada da função para análise dos findings
+          analyze_findings "code-scanning"
+          analyze_findings "secrets"
+          analyze_findings "dependabot"
 
 
 
