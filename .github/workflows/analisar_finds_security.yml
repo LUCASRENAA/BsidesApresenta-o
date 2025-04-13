@@ -165,8 +165,9 @@ jobs:
               echo "🧠 Resultado da IA: $result"
             fi
 
-          done
-          }
+
+            done
+            }
           # Chamada da função para análise dos findings
           analyze_findings "code-scanning"
           analyze_findings "secrets"
