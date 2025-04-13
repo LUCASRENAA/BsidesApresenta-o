@@ -2,13 +2,9 @@ name: Analyze GitHub Security Findings
 
 on:
   push:
-    branches:
-      - main
-      - Dev
+    branches: [main, Dev]
   pull_request:
-    branches:
-      - main
-      - Dev
+    branches: [main, Dev]
 
 permissions:
   contents: read
@@ -32,7 +28,7 @@ jobs:
         run: |
           sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common
           curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-          sudo sh -c "echo 'deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable' > /etc/apt/sources.list.d/docker.list"
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list
           sudo apt-get update
           sudo apt-get install -y docker-ce docker-ce-cli containerd.io
           sudo curl -L "https://github.com/docker/compose/releases/download/$(curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r .tag_name)/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
@@ -42,13 +38,20 @@ jobs:
         uses: docker/setup-buildx-action@v2
 
       - name: Build Docker Image (caso necessário)
-        run: |
-          docker-compose -f docker-compose.yml build
+        run: docker-compose -f docker-compose.yml build
 
       - name: Iniciar Containers
         run: |
           docker-compose -f docker-compose.yml up -d
           sudo docker exec ollama ollama pull tinyllama
+
+      - name: Aguardar TinyLlama ficar disponível
+        run: |
+          echo "⏳ Aguardando TinyLlama responder..."
+          until curl -s http://localhost:11434/api/tags > /dev/null; do
+            sleep 3
+          done
+          echo "✅ TinyLlama disponível."
 
       - name: Baixar findings de segurança
         run: |
@@ -59,118 +62,86 @@ jobs:
             https://api.github.com/repos/${{ github.repository }}/code-scanning/alerts \
             -o findings/code-scanning.json
 
-          echo "Exibindo findings do Code Scanning..."
-          cat findings/code-scanning.json
-
           echo "🔐 Baixando Secret Scanning..."
           curl -s -H "Authorization: token ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}" \
             https://api.github.com/repos/${{ github.repository }}/secret-scanning/alerts \
             -o findings/secrets.json || echo "Erro ao baixar Secret Scanning"
-
-          echo "Exibindo findings do Secret Scanning..."
-          cat findings/secrets.json
 
           echo "📦 Baixando Dependabot..."
           curl -s -H "Authorization: token ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}" \
             https://api.github.com/repos/${{ github.repository }}/dependabot/alerts \
             -o findings/dependabot.json || echo "Erro ao baixar Dependabot"
 
-          echo "Exibindo findings do Dependabot..."
-          cat findings/dependabot.json
-
       - name: Analisar cada finding com TinyLlama
         run: |
           analyze_findings() {
             local type="$1"
             local file="findings/${type}.json"
-
             echo "🔎 Analisando findings de ${type}..."
-            count=$(jq length "$file")
 
+            if ! [ -s "$file" ]; then
+              echo "⚠️ Arquivo vazio ou inexistente: $file"
+              return
+            fi
+
+            count=$(jq length "$file")
             if [ "$count" -eq 0 ]; then
               echo "✅ Nenhum finding de ${type} encontrado."
               return
             fi
 
             for i in $(seq 0 $(($count - 1))); do
-              # Obter o finding atual corretamente com jq
-              finding=$(jq -r ".[$i]" "$file")
-
-              # Agora, com a string JSON limpa, podemos usar o jq diretamente:
+              finding=$(jq ".[$i]" "$file")
               number=$(echo "$finding" | jq -r '.number')
               created_at=$(echo "$finding" | jq -r '.created_at')
               updated_at=$(echo "$finding" | jq -r '.updated_at')
-              description=$(echo "$finding" | jq -r '.rule.description')
-              severity=$(echo "$finding" | jq -r '.rule.severity')
-              location_path=$(echo "$finding" | jq -r '.most_recent_instance.location.path')
-              location_line=$(echo "$finding" | jq -r '.most_recent_instance.location.start_line')
-              message_text=$(echo "$finding" | jq -r '.most_recent_instance.message.text')
-              html_url=$(echo "$finding" | jq -r '.html_url')
-              help_uri=$(echo "$finding" | jq -r '.rule.help_uri')
+              description=$(echo "$finding" | jq -r '.rule.description // "N/A"')
+              severity=$(echo "$finding" | jq -r '.rule.severity // "N/A"')
+              location_path=$(echo "$finding" | jq -r '.most_recent_instance.location.path // "N/A"')
+              location_line=$(echo "$finding" | jq -r '.most_recent_instance.location.start_line // "N/A"')
+              message_text=$(echo "$finding" | jq -r '.most_recent_instance.message.text // "N/A"')
+              html_url=$(echo "$finding" | jq -r '.html_url // "N/A"')
+              help_uri=$(echo "$finding" | jq -r '.rule.help_uri // "N/A"')
 
-              # Exibir os valores para depuração
-              echo "ID do Finding: $number"
-              echo "Criado em: $created_at"
-              echo "Atualizado em: $updated_at"
-              echo "Descrição: $description"
-              echo "Severidade: $severity"
-              echo "Caminho: $location_path"
-              echo "Linha: $location_line"
-              echo "Mensagem: $message_text"
-              echo "Link do finding: $html_url"
-              echo "Help URI: $help_uri"
+              formatted_prompt="Analisando vulnerabilidade encontrada no repositório: ${{ github.repository }}
 
-              # Criar o texto formatado para enviar ao modelo
-              formatted_prompt="Analisando vulnerabilidade encontrada no repositório: BsidesApresenta-o
+- **ID do Finding**: $number
+- **Data de Criação**: $created_at
+- **Data de Atualização**: $updated_at
+- **Descrição do Finding**: $description
+- **Severidade**: $severity
 
-              - **ID do Finding**: $number
-              - **Data de Criação**: $created_at
-              - **Data de Atualização**: $updated_at
-              - **Descrição do Finding**: $description
-              - **Severidade**: $severity
+### Localização:
+- **Caminho**: $location_path
+- **Linha**: $location_line
 
-              ### Localização:
-              - **Caminho**: $location_path
-              - **Linha**: $location_line
+### Mensagem Adicional:
+$message_text
 
-              ### Mensagem Adicional:
-              $message_text
+### Ação Recomendada:
+1. Verifique se a vulnerabilidade corresponde à descrição.
+2. Realize a correção ou substituição de senhas expostas no código.
+3. Consulte a documentação para mais informações: $help_uri
 
-              ### Ação Recomendada:
-              1. Verifique se a vulnerabilidade corresponde à descrição.
-              2. Realize a correção ou substituição de senhas expostas no código.
-              3. Consulte a documentação para mais informações: $help_uri
+### Link para o finding no GitHub:
+$html_url"
 
-              ### Link para o finding no GitHub:
-              $html_url
-              "
+              # Escapar o prompt corretamente usando jq
+              json=$(jq -n --arg model "tinyllama" --arg prompt "$formatted_prompt" '{model: $model, stream: false, prompt: $prompt}')
 
-              # Adicionar debug para visualizar o prompt completo
-              echo "🔍 Enviando prompt para o TinyLlama: $formatted_prompt"
-
-              # Enviar para a API do TinyLlama
               response=$(curl -s -X POST http://localhost:11434/api/generate \
                 -H "Content-Type: application/json" \
-                -d "{\"model\": \"tinyllama\", \"stream\": false, \"prompt\": \"$formatted_prompt\"}")
+                -d "$json")
 
-              # Verificar se a resposta tem o campo 'response'
               result=$(echo "$response" | jq -r '.response // .error')
 
-              echo "Resposta da IA: $response"
-
-              if [ "$result" == "null" ]; then
-                echo "⚠️ Erro na resposta da IA: $response"
-              else
-                echo "🧠 Resultado da IA: $result"
-              fi
+              echo "🧠 Resultado da IA: $result"
             done
           }
 
-          # Chamada da função para análise dos findings
           analyze_findings "code-scanning"
           analyze_findings "secrets"
           analyze_findings "dependabot"
 
       - name: Parar ambiente TinyLlama
-        run: |
-            docker stop ollama && docker rm ollama
+        run: docker stop ollama && docker rm ollama
