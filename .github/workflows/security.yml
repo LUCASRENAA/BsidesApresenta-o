@@ -101,7 +101,7 @@ jobs:
         run: |
           sleep 15  # Aguarda 15 segundos para garantir que o Ollama esteja inicializado
 
-     - name: Enviar resultados Trivy para TinyLlama
+      - name: Enviar resultados Trivy para TinyLlama
         run: |
           if [ -f "trivy-results.sarif" ]; then
             echo "Arquivo trivy-results.sarif encontrado. Enviando para análise..."
