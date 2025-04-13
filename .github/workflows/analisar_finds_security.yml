@@ -117,7 +117,7 @@ jobs:
               # Escapar o prompt usando jq
               escaped_prompt=$(jq -R <<< "$formatted_prompt" | jq -s .)
 
-              response=$(curl -s -X POST http://localhost:11434/api/generate \
+              response=$(curl -s -X POST http://localhost:11399/api/generate \
                 -H "Content-Type: application/json" \
                 -d "{\"model\": \"tinyllama\", \"stream\": false, \"prompt\": $escaped_prompt}" || echo "erro")
 
