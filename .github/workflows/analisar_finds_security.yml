@@ -32,7 +32,7 @@ jobs:
         run: |
           sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common
           curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-          sudo sh -c "echo 'deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable' > /etc/apt/sources.list.d/docker.list"
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list
           sudo apt-get update
           sudo apt-get install -y docker-ce docker-ce-cli containerd.io
           sudo curl -L "https://github.com/docker/compose/releases/download/$(curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r .tag_name)/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
@@ -59,24 +59,15 @@ jobs:
             https://api.github.com/repos/${{ github.repository }}/code-scanning/alerts \
             -o findings/code-scanning.json
 
-          echo "Exibindo findings do Code Scanning..."
-          cat findings/code-scanning.json
-
           echo "🔐 Baixando Secret Scanning..."
           curl -s -H "Authorization: token ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}" \
             https://api.github.com/repos/${{ github.repository }}/secret-scanning/alerts \
             -o findings/secrets.json || echo "Erro ao baixar Secret Scanning"
 
-          echo "Exibindo findings do Secret Scanning..."
-          cat findings/secrets.json
-
           echo "📦 Baixando Dependabot..."
           curl -s -H "Authorization: token ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}" \
             https://api.github.com/repos/${{ github.repository }}/dependabot/alerts \
             -o findings/dependabot.json || echo "Erro ao baixar Dependabot"
-
-          echo "Exibindo findings do Dependabot..."
-          cat findings/dependabot.json
 
       - name: Analisar cada finding com TinyLlama
         run: |
@@ -93,10 +84,8 @@ jobs:
             fi
 
             for i in $(seq 0 $(($count - 1))); do
-              # Obter o finding atual corretamente com jq
               finding=$(jq -r ".[$i]" "$file")
 
-              # Agora, com a string JSON limpa, podemos usar o jq diretamente:
               number=$(echo "$finding" | jq -r '.number')
               created_at=$(echo "$finding" | jq -r '.created_at')
               updated_at=$(echo "$finding" | jq -r '.updated_at')
@@ -108,18 +97,6 @@ jobs:
               html_url=$(echo "$finding" | jq -r '.html_url')
               help_uri=$(echo "$finding" | jq -r '.rule.help_uri')
 
-              # Exibir os valores para depuração
-              echo "ID do Finding: $number"
-              echo "Criado em: $created_at"
-              echo "Atualizado em: $updated_at"
-              echo "Descrição: $description"
-              echo "Severidade: $severity"
-              echo "Caminho: $location_path"
-              echo "Linha: $location_line"
-              echo "Mensagem: $message_text"
-              echo "Link do finding: $html_url"
-              echo "Help URI: $help_uri"
-
               formatted_prompt="Analisando vulnerabilidade encontrada no repositório: BsidesApresenta-o
 
               ID do Finding foi $number
@@ -127,16 +104,11 @@ jobs:
               Data de Atualização foi $updated_at
               Descrição do Finding foi $description
               Severidade foi $severity
-
-              
               Caminho foi $location_path
               Linha foi $location_line
-
               Mensagem foi $message_text
-
               avalie se foi falso positivo ou nao
-               Consulte a documentação para mais informações caso queira $help_uri
-
+              Consulte a documentação para mais informações caso queira $help_uri
               Link para o finding no GitHub foi 
               $html_url
               "
@@ -159,7 +131,6 @@ jobs:
             done
           }
 
-          # Chamada da função para análise dos findings
           analyze_findings "code-scanning"
           echo "🧪 Tentando analisar secrets.json..."
           ( analyze_findings "secrets" ) || echo "⚠️ Erro ao analisar findings de secrets ou arquivo inválido."
@@ -169,4 +140,4 @@ jobs:
 
       - name: Parar ambiente TinyLlama
         run: |
-            docker stop ollama && docker rm ollama
+          docker stop ollama && docker rm ollama
