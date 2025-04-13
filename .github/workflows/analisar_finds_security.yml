@@ -81,21 +81,20 @@ jobs:
       - name: Analisar cada finding com TinyLlama
         run: |
           analyze_findings() {
-          local type="$1"
-          local file="findings/${type}.json"
+            local type="$1"
+            local file="findings/${type}.json"
 
-          echo "🔎 Analisando findings de ${type}..."
-          count=$(jq length "$file")
+            echo "🔎 Analisando findings de ${type}..."
+            count=$(jq length "$file")
 
-          if [ "$count" -eq 0 ]; then
-            echo "✅ Nenhum finding de ${type} encontrado."
-            return
-          fi
+            if [ "$count" -eq 0 ]; then
+              echo "✅ Nenhum finding de ${type} encontrado."
+              return
+            fi
 
-          for i in $(seq 0 $(($count - 1))); do
+            for i in $(seq 0 $(($count - 1))); do
               # Obter o finding atual
-              # Supondo que o prompt seja passado como uma string JSON, mas com escape, podemos usar `jq` para "limpar" o JSON
-              finding=$(echo "$finding" | jq -Rs .)  # Escapando a string JSON para um formato que jq entenda
+              finding=$(jq -r ".[$i]" "$file")
 
               # Agora, com a string JSON limpa, podemos usar o jq diretamente:
               number=$(echo "$finding" | jq -r '.number')
@@ -159,20 +158,14 @@ jobs:
               else
                 echo "🧠 Resultado da IA: $result"
               fi
-
-
-
-
             done
           }
+
           # Chamada da função para análise dos findings
           analyze_findings "code-scanning"
           analyze_findings "secrets"
           analyze_findings "dependabot"
 
-
-
-
       - name: Parar ambiente TinyLlama
         run: |
-            docker stop ollama && docker rm ollama
+          docker stop ollama && docker rm ollama
