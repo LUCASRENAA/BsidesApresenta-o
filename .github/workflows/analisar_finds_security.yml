@@ -105,26 +105,26 @@ jobs:
 
               formatted_prompt="Analisando vulnerabilidade encontrada no repositório: ${{ github.repository }}
 
-- **ID do Finding**: $number
-- **Data de Criação**: $created_at
-- **Data de Atualização**: $updated_at
-- **Descrição do Finding**: $description
-- **Severidade**: $severity
+              - **ID do Finding**: $number
+              - **Data de Criação**: $created_at
+              - **Data de Atualização**: $updated_at
+              - **Descrição do Finding**: $description
+              - **Severidade**: $severity
 
-### Localização:
-- **Caminho**: $location_path
-- **Linha**: $location_line
+              ### Localização:
+              - **Caminho**: $location_path
+              - **Linha**: $location_line
 
-### Mensagem Adicional:
-$message_text
+              ### Mensagem Adicional:
+              $message_text
 
-### Ação Recomendada:
-1. Verifique se a vulnerabilidade corresponde à descrição.
-2. Realize a correção ou substituição de senhas expostas no código.
-3. Consulte a documentação para mais informações: $help_uri
+              ### Ação Recomendada:
+              1. Verifique se a vulnerabilidade corresponde à descrição.
+              2. Realize a correção ou substituição de senhas expostas no código.
+              3. Consulte a documentação para mais informações: $help_uri
 
-### Link para o finding no GitHub:
-$html_url"
+              ### Link para o finding no GitHub:
+              $html_url"
 
               # Escapar o prompt corretamente usando jq
               json=$(jq -n --arg model "tinyllama" --arg prompt "$formatted_prompt" '{model: $model, stream: false, prompt: $prompt}')
