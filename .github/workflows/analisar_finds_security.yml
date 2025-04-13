@@ -9,7 +9,7 @@ on:
     branches:
       - main
       - Dev
-      
+
 permissions:
   contents: read
   security-events: read  # necessário para acessar findings via API
@@ -113,6 +113,6 @@ jobs:
             analyze_findings "secrets"
             analyze_findings "dependabot"
 
-      - name: Parar ambiente TinyLlama
-        run: |
-          docker stop ollama && docker rm ollama
+        - name: Parar ambiente TinyLlama
+          run: |
+            docker stop ollama && docker rm ollama
