@@ -39,14 +39,12 @@ jobs:
       - name: Iniciar Containers
         run: |
           docker-compose -f docker-compose.yml up -d
+          sudo docker exec ollama ollama pull tinyllama
 
       - name: Aguardar containers subirem
         run: |
-          sleep 30  # Aguarda 30 segundos para garantir que o Ollama esteja inicializado
-
-      - name: Pull do modelo TinyLlama no container
-        run: |
-          sudo docker exec -it ollama ollama pull tinyllama
+          sleep 15  # Aguarda 15 segundos para garantir que o Ollama esteja inicializado
+          
 
       - name: Executar CURL para gerar resposta
         run: |
