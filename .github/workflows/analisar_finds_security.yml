@@ -1,10 +1,15 @@
 name: Analyze GitHub Security Findings
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - Dev
   pull_request:
-    branches: [main, Dev]
-
+    branches:
+      - main
+      - Dev
+      
 permissions:
   contents: read
   security-events: read  # necessário para acessar findings via API
