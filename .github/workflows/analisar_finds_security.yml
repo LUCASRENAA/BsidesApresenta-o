@@ -45,13 +45,7 @@ jobs:
           docker-compose -f docker-compose.yml up -d
           sudo docker exec ollama ollama pull tinyllama
 
-      - name: Aguardar TinyLlama ficar disponível
-        run: |
-          echo "⏳ Aguardando TinyLlama responder..."
-          until curl -s http://localhost:11434/api/tags > /dev/null; do
-            sleep 3
-          done
-          echo "✅ TinyLlama disponível."
+    
 
       - name: Baixar findings de segurança
         run: |
