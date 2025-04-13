@@ -104,34 +104,47 @@ jobs:
       - name: Enviar resultados Trivy para TinyLlama
         run: |
           if [ -f "trivy-results.sarif" ]; then
-            echo "Arquivo trivy-results.sarif encontrado. Enviando para análise..."
-            trivy_results=$(jq -c . < trivy-results.sarif)
+            echo "📄 Arquivo trivy-results.sarif encontrado. Enviando para análise com TinyLlama..."
+            
+            # Cria prompt concatenando explicação com o conteúdo SARIF como string JSON
+            prompt=$(jq -Rs --arg prefix "Aqui estão os resultados do Trivy em formato SARIF. Analise e forneça um resumo e recomendações de segurança: " '$prefix + .' < trivy-results.sarif)
+
+            # Faz a requisição
             response=$(curl -s -X POST http://localhost:11399/api/generate \
               -H "Content-Type: application/json" \
-              -d "{\"model\": \"tinyllama\", \"prompt\": \"Aqui estão os resultados do Trivy em formato SARIF. Analise e forneça um resumo e recomendações de segurança: ${trivy_results}\", \"stream\": false}")
+              -d "{\"model\": \"tinyllama\", \"prompt\": ${prompt}, \"stream\": false}")
             
-            echo "Resposta completa da API:"
-            echo "$response" | jq  # Veja toda a estrutura
+            echo "🧠 Resposta completa da API:"
+            echo "$response" | jq
 
-            echo "Resumo extraído:"
+            echo "📝 Resumo extraído:"
             echo "$response" | jq -r '.response // .error'
           else
             echo "⚠️ Arquivo trivy-results.sarif não encontrado. Pulando etapa."
           fi
 
 
+
       - name: Enviar resultados Bandit para TinyLlama
         run: |
           if [ -f "bandit-results.sarif" ]; then
-            echo "Arquivo bandit-results.sarif encontrado. Enviando para análise..."
-            bandit_results=$(jq -Rs . < bandit-results.sarif)
+            echo "📄 Arquivo bandit-results.sarif encontrado. Enviando para análise com TinyLlama..."
+            
+            prompt=$(jq -Rs --arg prefix "Aqui estão os resultados do Bandit em formato SARIF. Analise e forneça um resumo e recomendações de segurança: " '$prefix + .' < bandit-results.sarif)
+
             response=$(curl -s -X POST http://localhost:11399/api/generate \
               -H "Content-Type: application/json" \
-              -d "{\"model\": \"tinyllama\", \"prompt\": \"Aqui estão os resultados do Bandit em formato SARIF. Analise e forneça um resumo e recomendações de segurança: ${bandit_results}\", \"stream\": false}")
-            echo "$response" | jq -r '.response'
+              -d "{\"model\": \"tinyllama\", \"prompt\": ${prompt}, \"stream\": false}")
+
+            echo "🧠 Resposta completa da API:"
+            echo "$response" | jq
+
+            echo "📝 Resumo extraído:"
+            echo "$response" | jq -r '.response // .error'
           else
             echo "⚠️ Arquivo bandit-results.sarif não encontrado. Pulando etapa."
           fi
+
       - name: Parar Containers
         run: |
           docker-compose -f docker-compose.yml down
