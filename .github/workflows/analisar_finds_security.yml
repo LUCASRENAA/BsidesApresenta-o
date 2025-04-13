@@ -69,13 +69,20 @@ jobs:
             https://api.github.com/repos/${{ github.repository }}/dependabot/alerts \
             -o findings/dependabot.json || echo "Erro ao baixar Dependabot"
 
-      - name: Analisar cada finding com TinyLlama
+            - name: Analisar cada finding com TinyLlama
         run: |
           analyze_findings() {
             local type="$1"
             local file="findings/${type}.json"
 
             echo "🔎 Analisando findings de ${type}..."
+
+            # Verifica se o JSON é um array
+            if ! jq -e 'type == "array"' "$file" > /dev/null; then
+              echo "⚠️ O arquivo $file não é um array. Pulando..."
+              return
+            fi
+
             count=$(jq length "$file")
 
             if [ "$count" -eq 0 ]; then
@@ -86,16 +93,27 @@ jobs:
             for i in $(seq 0 $(($count - 1))); do
               finding=$(jq -r ".[$i]" "$file")
 
-              number=$(echo "$finding" | jq -r '.number')
-              created_at=$(echo "$finding" | jq -r '.created_at')
-              updated_at=$(echo "$finding" | jq -r '.updated_at')
-              description=$(echo "$finding" | jq -r '.rule.description')
-              severity=$(echo "$finding" | jq -r '.rule.severity')
-              location_path=$(echo "$finding" | jq -r '.most_recent_instance.location.path')
-              location_line=$(echo "$finding" | jq -r '.most_recent_instance.location.start_line')
-              message_text=$(echo "$finding" | jq -r '.most_recent_instance.message.text')
-              html_url=$(echo "$finding" | jq -r '.html_url')
-              help_uri=$(echo "$finding" | jq -r '.rule.help_uri')
+              number=$(echo "$finding" | jq -r '.number // empty')
+              created_at=$(echo "$finding" | jq -r '.created_at // empty')
+              updated_at=$(echo "$finding" | jq -r '.updated_at // empty')
+              description=$(echo "$finding" | jq -r '.rule.description // empty')
+              severity=$(echo "$finding" | jq -r '.rule.severity // empty')
+              location_path=$(echo "$finding" | jq -r '.most_recent_instance.location.path // empty')
+              location_line=$(echo "$finding" | jq -r '.most_recent_instance.location.start_line // empty')
+              message_text=$(echo "$finding" | jq -r '.most_recent_instance.message.text // empty')
+              html_url=$(echo "$finding" | jq -r '.html_url // empty')
+              help_uri=$(echo "$finding" | jq -r '.rule.help_uri // empty')
+
+              echo "ID do Finding: $number"
+              echo "Criado em: $created_at"
+              echo "Atualizado em: $updated_at"
+              echo "Descrição: $description"
+              echo "Severidade: $severity"
+              echo "Caminho: $location_path"
+              echo "Linha: $location_line"
+              echo "Mensagem: $message_text"
+              echo "Link do finding: $html_url"
+              echo "Help URI: $help_uri"
 
               formatted_prompt="Analisando vulnerabilidade encontrada no repositório: BsidesApresenta-o
 
@@ -104,26 +122,31 @@ jobs:
               Data de Atualização foi $updated_at
               Descrição do Finding foi $description
               Severidade foi $severity
+
               Caminho foi $location_path
               Linha foi $location_line
+
               Mensagem foi $message_text
+
               avalie se foi falso positivo ou nao
               Consulte a documentação para mais informações caso queira $help_uri
+
               Link para o finding no GitHub foi 
               $html_url
               "
 
-              echo "🔍 Enviando prompt para o TinyLlama: $formatted_prompt"
+              echo "🔍 Enviando prompt para o TinyLlama..."
+
+              # Escapar o prompt usando jq
+              escaped_prompt=$(jq -R <<< "$formatted_prompt" | jq -s .)
 
               response=$(curl -s -X POST http://localhost:11399/api/generate \
                 -H "Content-Type: application/json" \
-                -d "{\"model\": \"tinyllama\", \"stream\": false, \"prompt\": \"$formatted_prompt\"}")
+                -d "{\"model\": \"tinyllama\", \"stream\": false, \"prompt\": $escaped_prompt}" || echo "erro")
 
               result=$(echo "$response" | jq -r '.response // .error')
 
-              echo "Resposta da IA: $response"
-
-              if [ "$result" == "null" ]; then
+              if [ "$result" == "null" ] || [ "$result" == "erro" ]; then
                 echo "⚠️ Erro na resposta da IA: $response"
               else
                 echo "🧠 Resultado da IA: $result"
@@ -131,6 +154,7 @@ jobs:
             done
           }
 
+          # Chamada da função para análise dos findings
           analyze_findings "code-scanning"
           echo "🧪 Tentando analisar secrets.json..."
           ( analyze_findings "secrets" ) || echo "⚠️ Erro ao analisar findings de secrets ou arquivo inválido."
