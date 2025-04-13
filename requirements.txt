@@ -1,5 +1,5 @@
 # Django com CVE-2022-34265, CVE-2021-44420
-django==3.2.28
+django==2.2.28
 
 # djangorestframework com CVE-2021-28359
 djangorestframework==3.11.1
