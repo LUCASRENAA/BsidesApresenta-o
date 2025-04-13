@@ -3,7 +3,7 @@ name: Gerar resposta com TinyLlama
 on:
   push:
     branches:
-      - main
+      - nenhuma
   workflow_dispatch:
 
 jobs:
