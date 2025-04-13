@@ -122,7 +122,8 @@ jobs:
             help_uri=$(echo "$prompt" | jq -r '.rule.help_uri')
 
             # Criar o texto formatado para enviar ao modelo
-            formatted_prompt=$(cat <<EOF
+            # Criar o texto formatado para enviar ao modelo
+            formatted_prompt=$(cat <<'EOF'
             Analisando vulnerabilidade encontrada no repositório: BsidesApresenta-o
 
             - **ID do Finding**: $number
@@ -147,6 +148,8 @@ jobs:
             $html_url
             EOF
             )
+
+
 
             # Escapar o texto formatado para garantir que seja um JSON válido
             escaped_prompt=$(echo "$formatted_prompt" | jq -Rs .)
