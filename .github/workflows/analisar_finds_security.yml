@@ -79,8 +79,8 @@ jobs:
           cat findings/dependabot.json  # Exibe o conteúdo do arquivo baixado
 
 
-        - name: Analisar cada finding com TinyLlama
-          run: |
+      - name: Analisar cada finding com TinyLlama
+        run: |
             analyze_findings() {
               local type="$1"
               local file="findings/${type}.json"
@@ -113,6 +113,6 @@ jobs:
             analyze_findings "secrets"
             analyze_findings "dependabot"
 
-        - name: Parar ambiente TinyLlama
-          run: |
+      - name: Parar ambiente TinyLlama
+        run: |
             docker stop ollama && docker rm ollama
