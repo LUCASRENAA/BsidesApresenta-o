@@ -83,7 +83,8 @@ username_token = "admin"
 password_token = "admin"
 username_token2 = "admin"
 password_token2 = "admin"
-
+username_token3 = "admin"
+password_token3 = "admin"
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
 
