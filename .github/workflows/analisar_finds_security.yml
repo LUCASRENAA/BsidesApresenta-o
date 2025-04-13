@@ -45,7 +45,7 @@ jobs:
           docker-compose -f docker-compose.yml up -d
           sudo docker exec ollama ollama pull tinyllama
 
-      - name: Baixar findings do GitHub Security
+      - name: Baixar findings de segurança
         run: |
           mkdir -p findings
 
@@ -54,15 +54,25 @@ jobs:
             https://api.github.com/repos/${{ github.repository }}/code-scanning/alerts \
             -o findings/code-scanning.json
 
+          echo "Exibindo findings do Code Scanning..."
+          cat findings/code-scanning.json  # Exibe o conteúdo do arquivo baixado
+
           echo "🔐 Baixando Secret Scanning..."
           curl -s -H "Authorization: token ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}" \
             https://api.github.com/repos/${{ github.repository }}/secret-scanning/alerts \
             -o findings/secrets.json
 
+          echo "Exibindo findings do Secret Scanning..."
+          cat findings/secrets.json  # Exibe o conteúdo do arquivo baixado
+
           echo "📦 Baixando Dependabot..."
           curl -s -H "Authorization: token ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}" \
             https://api.github.com/repos/${{ github.repository }}/dependabot/alerts \
             -o findings/dependabot.json
+
+          echo "Exibindo findings do Dependabot..."
+          cat findings/dependabot.json  # Exibe o conteúdo do arquivo baixado
+
 
       - name: Analisar cada finding com TinyLlama
         run: |
