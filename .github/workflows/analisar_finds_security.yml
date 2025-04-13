@@ -138,7 +138,6 @@ jobs:
               echo "🧠 Resultado da IA: $result"
             done
           }
-
           analyze_findings "code-scanning"
           analyze_findings "secrets"
           analyze_findings "dependabot"
