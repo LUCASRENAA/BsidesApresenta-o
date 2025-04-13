@@ -94,35 +94,33 @@ jobs:
 
           for i in $(seq 0 $(($count - 1))); do
             # Obter o finding atual
-            finding=$(jq -c ".[$i]" "$file")
+            # Supondo que o prompt seja passado como uma string JSON, mas com escape, podemos usar `jq` para "limpar" o JSON
+            finding=$(echo "$finding" | jq -Rs .)  # Escapando a string JSON para um formato que jq entenda
 
-            # Escapar qualquer caractere especial no finding
-            escaped_finding=$(echo "$finding" | jq -Rs .)
+            # Agora, com a string JSON limpa, podemos usar o jq diretamente:
+            number=$(echo "$finding" | jq -r '.number')
+            created_at=$(echo "$finding" | jq -r '.created_at')
+            updated_at=$(echo "$finding" | jq -r '.updated_at')
+            description=$(echo "$finding" | jq -r '.rule.description')
+            severity=$(echo "$finding" | jq -r '.rule.severity')
+            location_path=$(echo "$finding" | jq -r '.most_recent_instance.location.path')
+            location_line=$(echo "$finding" | jq -r '.most_recent_instance.location.start_line')
+            message_text=$(echo "$finding" | jq -r '.most_recent_instance.message.text')
+            html_url=$(echo "$finding" | jq -r '.html_url')
+            help_uri=$(echo "$finding" | jq -r '.rule.help_uri')
 
-            # Criar o prompt
-            prompt=$(jq -n --arg data "$escaped_finding" --arg type "$type" \
-              '$type + " finding: " + $data')
+            # Exibir os valores para depuração
+            echo "ID do Finding: $number"
+            echo "Criado em: $created_at"
+            echo "Atualizado em: $updated_at"
+            echo "Descrição: $description"
+            echo "Severidade: $severity"
+            echo "Caminho: $location_path"
+            echo "Linha: $location_line"
+            echo "Mensagem: $message_text"
+            echo "Link do finding: $html_url"
+            echo "Help URI: $help_uri"
 
-            echo "📤 Enviando para análise..."
-            
-            # Exibir o conteúdo do prompt para garantir que está correto
-            echo "🔍 Prompt gerado para o TinyLlama (Finding $i):"
-            echo "$prompt"
-
-            # Extrair os dados do JSON para variáveis
-            number=$(echo "$prompt" | jq -r '.number')
-            created_at=$(echo "$prompt" | jq -r '.created_at')
-            updated_at=$(echo "$prompt" | jq -r '.updated_at')
-            description=$(echo "$prompt" | jq -r '.rule.description')
-            severity=$(echo "$prompt" | jq -r '.rule.severity')
-            location_path=$(echo "$prompt" | jq -r '.most_recent_instance.location.path')
-            location_line=$(echo "$prompt" | jq -r '.most_recent_instance.location.start_line')
-            message_text=$(echo "$prompt" | jq -r '.most_recent_instance.message.text')
-            html_url=$(echo "$prompt" | jq -r '.html_url')
-            help_uri=$(echo "$prompt" | jq -r '.rule.help_uri')
-
-            # Criar o texto formatado para enviar ao modelo
-            # Criar o texto formatado para enviar ao modelo
             # Criar o texto formatado para enviar ao modelo
             formatted_prompt="Analisando vulnerabilidade encontrada no repositório: BsidesApresenta-o
 
@@ -161,6 +159,7 @@ jobs:
             else
               echo "🧠 Resultado da IA: $result"
             fi
+
 
 
 
