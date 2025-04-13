@@ -93,7 +93,7 @@ jobs:
             fi
 
             for i in $(seq 0 $(($count - 1))); do
-              # Obter o finding atual
+              # Obter o finding atual corretamente com jq
               finding=$(jq -r ".[$i]" "$file")
 
               # Agora, com a string JSON limpa, podemos usar o jq diretamente:
@@ -166,6 +166,9 @@ jobs:
           analyze_findings "secrets"
           analyze_findings "dependabot"
 
+
+
+
       - name: Parar ambiente TinyLlama
         run: |
-          docker stop ollama && docker rm ollama
+            docker stop ollama && docker rm ollama
