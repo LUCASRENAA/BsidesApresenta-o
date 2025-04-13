@@ -145,6 +145,9 @@ jobs:
               $html_url
               "
 
+              # Adicionar debug para visualizar o prompt completo
+              echo "🔍 Enviando prompt para o TinyLlama: $formatted_prompt"
+
               # Enviar para a API do TinyLlama
               response=$(curl -s -X POST http://localhost:11434/api/generate \
                 -H "Content-Type: application/json" \
@@ -152,6 +155,8 @@ jobs:
 
               # Verificar se a resposta tem o campo 'response'
               result=$(echo "$response" | jq -r '.response // .error')
+
+              echo "Resposta da IA: $response"
 
               if [ "$result" == "null" ]; then
                 echo "⚠️ Erro na resposta da IA: $response"
@@ -165,9 +170,6 @@ jobs:
           analyze_findings "code-scanning"
           analyze_findings "secrets"
           analyze_findings "dependabot"
-
-
-
 
       - name: Parar ambiente TinyLlama
         run: |
