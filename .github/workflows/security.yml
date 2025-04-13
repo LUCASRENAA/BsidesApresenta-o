@@ -126,9 +126,6 @@ jobs:
           else
             echo "⚠️ Arquivo bandit-results.sarif não encontrado. Pulando etapa."
           fi
-
-
-
       - name: Parar Containers
         run: |
           docker-compose -f docker-compose.yml down
