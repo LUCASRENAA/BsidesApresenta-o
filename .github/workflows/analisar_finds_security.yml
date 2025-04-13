@@ -123,8 +123,8 @@ jobs:
 
             # Criar o texto formatado para enviar ao modelo
             # Criar o texto formatado para enviar ao modelo
-            formatted_prompt=$(cat <<'EOF'
-            Analisando vulnerabilidade encontrada no repositório: BsidesApresenta-o
+            # Criar o texto formatado para enviar ao modelo
+            formatted_prompt="Analisando vulnerabilidade encontrada no repositório: BsidesApresenta-o
 
             - **ID do Finding**: $number
             - **Data de Criação**: $created_at
@@ -146,18 +146,12 @@ jobs:
 
             ### Link para o finding no GitHub:
             $html_url
-            EOF
-            )
-
-
-
-            # Escapar o texto formatado para garantir que seja um JSON válido
-            escaped_prompt=$(echo "$formatted_prompt" | jq -Rs .)
+            "
 
             # Enviar para a API do TinyLlama
             response=$(curl -s -X POST http://localhost:11434/api/generate \
               -H "Content-Type: application/json" \
-              -d "{\"model\": \"tinyllama\", \"stream\": false, \"prompt\": $escaped_prompt}")
+              -d "{\"model\": \"tinyllama\", \"stream\": false, \"prompt\": \"$formatted_prompt\"}")
 
             # Verificar se a resposta tem o campo 'response'
             result=$(echo "$response" | jq -r '.response // .error')
@@ -167,6 +161,7 @@ jobs:
             else
               echo "🧠 Resultado da IA: $result"
             fi
+
 
 
             done
