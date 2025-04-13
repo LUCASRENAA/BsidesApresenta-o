@@ -104,35 +104,20 @@ jobs:
       - name: Enviar resultados Trivy para TinyLlama
         run: |
           trivy_results=$(cat trivy-results.sarif)
-          response=$(curl -X POST http://localhost:11399/api/generate -d '{
+          curl -X POST http://localhost:11399/api/generate -d '{
             "model": "tinyllama",
-            "prompt": "Aqui estão os resultados do Trivy em formato SARIF. Analise e forneça um resumo e recomendações de segurança: '"$trivy_results"'",
+            "prompt": "Aqui estão os resultados do Trivy em formato SARIF. Analise e forneça um resumo e recomendações de segurança: " + "$trivy_results",
             "stream": false
-          }')
-          # Filtra a resposta para extrair apenas a parte relevante
-          filtered_response=$(echo $response | jq -r '.response')
-          echo "::set-output name=trivy_filtered_response::$filtered_response"
-
-      - name: Mostrar resposta do TinyLlama para Trivy
-        run: |
-          echo "Resposta filtrada do Trivy: ${{ steps.enviar_trivy.outputs.trivy_filtered_response }}"
+          }'
 
       - name: Enviar resultados Bandit para TinyLlama
         run: |
           bandit_results=$(cat bandit-results.sarif)
-          response=$(curl -X POST http://localhost:11399/api/generate -d '{
+          curl -X POST http://localhost:11399/api/generate -d '{
             "model": "tinyllama",
-            "prompt": "Aqui estão os resultados do Bandit em formato SARIF. Analise e forneça um resumo e recomendações de segurança: '"$bandit_results"'",
+            "prompt": "Aqui estão os resultados do Bandit em formato SARIF. Analise e forneça um resumo e recomendações de segurança: " + "$bandit_results",
             "stream": false
-          }')
-          # Filtra a resposta para extrair apenas a parte relevante
-          filtered_response=$(echo $response | jq -r '.response')
-          echo "::set-output name=bandit_filtered_response::$filtered_response"
-
-      - name: Mostrar resposta do TinyLlama para Bandit
-        run: |
-          echo "Resposta filtrada do Bandit: ${{ steps.enviar_bandit.outputs.bandit_filtered_response }}"
-
+          }'
 
       - name: Parar Containers
         run: |
