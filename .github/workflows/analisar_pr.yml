@@ -68,9 +68,13 @@ jobs:
       - name: Analisar mudanças com TinyLlama
         id: analysis
         run: |
-          patch=$(jq -Rs . < pr.diff)
+          # Ler o conteúdo do diff e formatá-lo como string
+          patch=$(cat pr.diff | jq -Rs .)  # Usando `jq -Rs` para tratar o diff como string
+
+          # Criar o prompt para o TinyLlama
           prompt=$(jq -n --arg txt "Analyze the following code diff as a security analyst. Identify any potential security issues or bad practices, and suggest improvements:\n" --arg diff "$patch" '$txt + $diff')
 
+          # Enviar para análise
           response=$(curl -s -X POST http://localhost:11434/api/generate \
             -H "Content-Type: application/json" \
             -d "{\"model\": \"tinyllama\", \"stream\": false, \"prompt\": $prompt}")
@@ -78,11 +82,11 @@ jobs:
           echo "Resultado:"
           echo "$response" | jq
 
+          # Obter o resumo da resposta ou erro
           summary=$(echo "$response" | jq -r '.response // .error')
           echo "summary<<EOF" >> $GITHUB_OUTPUT
           echo "$summary" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-
 
       - name: Comentar no PR
         if: github.event_name == 'pull_request'
