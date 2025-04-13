@@ -120,42 +120,52 @@ jobs:
               echo "Link do finding: $html_url"
               echo "Help URI: $help_uri"
 
-              # Criar o texto formatado para enviar ao modelo
               formatted_prompt="Analisando vulnerabilidade encontrada no repositório: BsidesApresenta-o
 
-              - **ID do Finding**: $number
-              - **Data de Criação**: $created_at
-              - **Data de Atualização**: $updated_at
-              - **Descrição do Finding**: $description
-              - **Severidade**: $severity
+              ID do Finding foi $number
+              Data de Criação foi  $created_at
+              Data de Atualização foi $updated_at
+              Descrição do Finding foi $description
+              Severidade foi $severity
 
-              ### Localização:
-              - **Caminho**: $location_path
-              - **Linha**: $location_line
+              
+              Caminho foi $location_path
+              Linha foi $location_line
 
-              ### Mensagem Adicional:
-              $message_text
+              Mensagem foi $message_text
 
-              ### Ação Recomendada:
-              1. Verifique se a vulnerabilidade corresponde à descrição.
-              2. Realize a correção ou substituição de senhas expostas no código.
-              3. Consulte a documentação para mais informações: $help_uri
+              avalie se foi falso positivo ou nao
+               Consulte a documentação para mais informações caso queira $help_uri
 
-              ### Link para o finding no GitHub:
+              Link para o finding no GitHub foi 
               $html_url
               "
 
-              # Adicionar debug para visualizar o prompt completo
               echo "🔍 Enviando prompt para o TinyLlama: $formatted_prompt"
 
-            
+              response=$(curl -s -X POST http://localhost:11434/api/generate \
+                -H "Content-Type: application/json" \
+                -d "{\"model\": \"tinyllama\", \"stream\": false, \"prompt\": \"$formatted_prompt\"}")
+
+              result=$(echo "$response" | jq -r '.response // .error')
+
+              echo "Resposta da IA: $response"
+
+              if [ "$result" == "null" ]; then
+                echo "⚠️ Erro na resposta da IA: $response"
+              else
+                echo "🧠 Resultado da IA: $result"
+              fi
             done
           }
 
           # Chamada da função para análise dos findings
           analyze_findings "code-scanning"
-          analyze_findings "secrets"
-          analyze_findings "dependabot"
+          echo "🧪 Tentando analisar secrets.json..."
+          ( analyze_findings "secrets" ) || echo "⚠️ Erro ao analisar findings de secrets ou arquivo inválido."
+
+          echo "🧪 Tentando analisar dependabot.json..."
+          ( analyze_findings "dependabot" ) || echo "⚠️ Erro ao analisar findings de dependabot ou arquivo inválido."
 
       - name: Parar ambiente TinyLlama
         run: |
