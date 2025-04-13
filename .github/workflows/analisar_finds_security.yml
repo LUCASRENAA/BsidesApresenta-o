@@ -93,78 +93,78 @@ jobs:
           fi
 
           for i in $(seq 0 $(($count - 1))); do
-            # Obter o finding atual
-            # Supondo que o prompt seja passado como uma string JSON, mas com escape, podemos usar `jq` para "limpar" o JSON
-            finding=$(echo "$finding" | jq -Rs .)  # Escapando a string JSON para um formato que jq entenda
+              # Obter o finding atual
+              # Supondo que o prompt seja passado como uma string JSON, mas com escape, podemos usar `jq` para "limpar" o JSON
+              finding=$(echo "$finding" | jq -Rs .)  # Escapando a string JSON para um formato que jq entenda
 
-            # Agora, com a string JSON limpa, podemos usar o jq diretamente:
-            number=$(echo "$finding" | jq -r '.number')
-            created_at=$(echo "$finding" | jq -r '.created_at')
-            updated_at=$(echo "$finding" | jq -r '.updated_at')
-            description=$(echo "$finding" | jq -r '.rule.description')
-            severity=$(echo "$finding" | jq -r '.rule.severity')
-            location_path=$(echo "$finding" | jq -r '.most_recent_instance.location.path')
-            location_line=$(echo "$finding" | jq -r '.most_recent_instance.location.start_line')
-            message_text=$(echo "$finding" | jq -r '.most_recent_instance.message.text')
-            html_url=$(echo "$finding" | jq -r '.html_url')
-            help_uri=$(echo "$finding" | jq -r '.rule.help_uri')
+              # Agora, com a string JSON limpa, podemos usar o jq diretamente:
+              number=$(echo "$finding" | jq -r '.number')
+              created_at=$(echo "$finding" | jq -r '.created_at')
+              updated_at=$(echo "$finding" | jq -r '.updated_at')
+              description=$(echo "$finding" | jq -r '.rule.description')
+              severity=$(echo "$finding" | jq -r '.rule.severity')
+              location_path=$(echo "$finding" | jq -r '.most_recent_instance.location.path')
+              location_line=$(echo "$finding" | jq -r '.most_recent_instance.location.start_line')
+              message_text=$(echo "$finding" | jq -r '.most_recent_instance.message.text')
+              html_url=$(echo "$finding" | jq -r '.html_url')
+              help_uri=$(echo "$finding" | jq -r '.rule.help_uri')
 
-            # Exibir os valores para depuração
-            echo "ID do Finding: $number"
-            echo "Criado em: $created_at"
-            echo "Atualizado em: $updated_at"
-            echo "Descrição: $description"
-            echo "Severidade: $severity"
-            echo "Caminho: $location_path"
-            echo "Linha: $location_line"
-            echo "Mensagem: $message_text"
-            echo "Link do finding: $html_url"
-            echo "Help URI: $help_uri"
+              # Exibir os valores para depuração
+              echo "ID do Finding: $number"
+              echo "Criado em: $created_at"
+              echo "Atualizado em: $updated_at"
+              echo "Descrição: $description"
+              echo "Severidade: $severity"
+              echo "Caminho: $location_path"
+              echo "Linha: $location_line"
+              echo "Mensagem: $message_text"
+              echo "Link do finding: $html_url"
+              echo "Help URI: $help_uri"
 
-            # Criar o texto formatado para enviar ao modelo
-            formatted_prompt="Analisando vulnerabilidade encontrada no repositório: BsidesApresenta-o
+              # Criar o texto formatado para enviar ao modelo
+              formatted_prompt="Analisando vulnerabilidade encontrada no repositório: BsidesApresenta-o
 
-            - **ID do Finding**: $number
-            - **Data de Criação**: $created_at
-            - **Data de Atualização**: $updated_at
-            - **Descrição do Finding**: $description
-            - **Severidade**: $severity
+              - **ID do Finding**: $number
+              - **Data de Criação**: $created_at
+              - **Data de Atualização**: $updated_at
+              - **Descrição do Finding**: $description
+              - **Severidade**: $severity
 
-            ### Localização:
-            - **Caminho**: $location_path
-            - **Linha**: $location_line
+              ### Localização:
+              - **Caminho**: $location_path
+              - **Linha**: $location_line
 
-            ### Mensagem Adicional:
-            $message_text
+              ### Mensagem Adicional:
+              $message_text
 
-            ### Ação Recomendada:
-            1. Verifique se a vulnerabilidade corresponde à descrição.
-            2. Realize a correção ou substituição de senhas expostas no código.
-            3. Consulte a documentação para mais informações: $help_uri
+              ### Ação Recomendada:
+              1. Verifique se a vulnerabilidade corresponde à descrição.
+              2. Realize a correção ou substituição de senhas expostas no código.
+              3. Consulte a documentação para mais informações: $help_uri
 
-            ### Link para o finding no GitHub:
-            $html_url
-            "
+              ### Link para o finding no GitHub:
+              $html_url
+              "
 
-            # Enviar para a API do TinyLlama
-            response=$(curl -s -X POST http://localhost:11434/api/generate \
-              -H "Content-Type: application/json" \
-              -d "{\"model\": \"tinyllama\", \"stream\": false, \"prompt\": \"$formatted_prompt\"}")
+              # Enviar para a API do TinyLlama
+              response=$(curl -s -X POST http://localhost:11434/api/generate \
+                -H "Content-Type: application/json" \
+                -d "{\"model\": \"tinyllama\", \"stream\": false, \"prompt\": \"$formatted_prompt\"}")
 
-            # Verificar se a resposta tem o campo 'response'
-            result=$(echo "$response" | jq -r '.response // .error')
+              # Verificar se a resposta tem o campo 'response'
+              result=$(echo "$response" | jq -r '.response // .error')
 
-            if [ "$result" == "null" ]; then
-              echo "⚠️ Erro na resposta da IA: $response"
-            else
-              echo "🧠 Resultado da IA: $result"
-            fi
+              if [ "$result" == "null" ]; then
+                echo "⚠️ Erro na resposta da IA: $response"
+              else
+                echo "🧠 Resultado da IA: $result"
+              fi
 
 
 
 
             done
-            }
+          }
           # Chamada da função para análise dos findings
           analyze_findings "code-scanning"
           analyze_findings "secrets"
