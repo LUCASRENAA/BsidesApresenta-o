@@ -74,39 +74,39 @@ jobs:
           cat findings/dependabot.json  # Exibe o conteúdo do arquivo baixado
 
 
-      - name: Analisar cada finding com TinyLlama
-        run: |
-          analyze_findings() {
-            local type="$1"
-            local file="findings/${type}.json"
+        - name: Analisar cada finding com TinyLlama
+          run: |
+            analyze_findings() {
+              local type="$1"
+              local file="findings/${type}.json"
 
-            echo "🔎 Analisando findings de ${type}..."
-            count=$(jq length "$file")
+              echo "🔎 Analisando findings de ${type}..."
+              count=$(jq length "$file")
 
-            if [ "$count" -eq 0 ]; then
-              echo "✅ Nenhum finding de ${type} encontrado."
-              return
-            fi
+              if [ "$count" -eq 0 ]; then
+                echo "✅ Nenhum finding de ${type} encontrado."
+                return
+              fi
 
-            for i in $(seq 0 $(($count - 1))); do
-              finding=$(jq -c ".[$i]" "$file")
-              prompt=$(jq -Rn --arg data "$finding" --arg type "$type" \
-                '$type + " finding: " + $data')
+              for i in $(seq 0 $(($count - 1))); do
+                finding=$(jq -c ".[$i]" "$file")
+                prompt=$(jq -Rn --arg data "$finding" --arg type "$type" \
+                  '$type + " finding: " + $data')
 
-              echo "📤 Enviando para análise..."
-              response=$(curl -s -X POST http://localhost:11434/api/generate \
-                -H "Content-Type: application/json" \
-                -d "{\"model\": \"tinyllama\", \"prompt\": $prompt, \"stream\": false}")
+                echo "📤 Enviando para análise..."
+                response=$(curl -s -X POST http://localhost:11434/api/generate \
+                  -H "Content-Type: application/json" \
+                  -d "{\"model\": \"tinyllama\", \"stream\": false, \"prompt\": $prompt}")
 
-              echo "🧠 Resultado da IA (Finding $i):"
-              echo "$response" | jq -r '.response // .error'
-              echo "---"
-            done
-          }
+                echo "🧠 Resultado da IA (Finding $i):"
+                echo "$response" | jq -r '.response // .error'
+                echo "---"
+              done
+            }
 
-          analyze_findings "code-scanning"
-          analyze_findings "secrets"
-          analyze_findings "dependabot"
+            analyze_findings "code-scanning"
+            analyze_findings "secrets"
+            analyze_findings "dependabot"
 
       - name: Parar ambiente TinyLlama
         run: |
