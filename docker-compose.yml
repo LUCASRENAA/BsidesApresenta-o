@@ -1,0 +1,41 @@
+version: '3.9'
+
+services:
+  # Django App
+  web:
+    build: .
+    container_name: django-app
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    depends_on:
+      - ollama
+
+  # Ollama
+  ollama:
+    image: ollama/ollama
+    container_name: ollama
+    ports:
+      - "11399:11434"  # <-- Alterado aqui
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
+  # Open WebUI (opcional, para visualizar a IA local)
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    ports:
+      - "3000:3000"
+    environment:
+      - OLLAMA_API_BASE_URL=http://ollama:11399  # <-- Alterado aqui também
+    volumes:
+      - open_webui_data:/app/backend/data
+    depends_on:
+      - ollama
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
+  open_webui_data:

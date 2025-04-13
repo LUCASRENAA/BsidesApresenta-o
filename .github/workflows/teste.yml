@@ -1,0 +1,46 @@
+name: Gerar resposta com TinyLlama
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checar código do repositório
+        uses: actions/checkout@v3
+
+      - name: Configurar Docker
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build Docker Image (caso necessário)
+        run: |
+          docker-compose -f docker-compose.yml build
+
+      - name: Iniciar Containers
+        run: |
+          docker-compose -f docker-compose.yml up -d
+
+      - name: Aguardar containers subirem
+        run: |
+          sleep 30  # Aguarda 30 segundos para garantir que o Ollama esteja inicializado
+
+      - name: Pull do modelo TinyLlama no container
+        run: |
+          sudo docker exec -it ollama ollama pull tinyllama
+
+      - name: Executar CURL para gerar resposta
+        run: |
+          curl -X POST http://localhost:11399/api/generate -d '{
+            "model": "tinyllama",
+            "prompt": "Explique o que é um ataque CSRF. Uma vulnerabilidade da owasp",
+            "stream": false
+          }'
+
+      - name: Parar Containers
+        run: |
+          docker-compose -f docker-compose.yml down
