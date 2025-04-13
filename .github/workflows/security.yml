@@ -105,14 +105,20 @@ jobs:
         run: |
           if [ -f "trivy-results.sarif" ]; then
             echo "Arquivo trivy-results.sarif encontrado. Enviando para análise..."
-            trivy_results=$(jq -Rs . < trivy-results.sarif)
+            trivy_results=$(jq -c . < trivy-results.sarif)
             response=$(curl -s -X POST http://localhost:11399/api/generate \
               -H "Content-Type: application/json" \
               -d "{\"model\": \"tinyllama\", \"prompt\": \"Aqui estão os resultados do Trivy em formato SARIF. Analise e forneça um resumo e recomendações de segurança: ${trivy_results}\", \"stream\": false}")
-            echo "$response" | jq -r '.response'
+            
+            echo "Resposta completa da API:"
+            echo "$response" | jq  # Veja toda a estrutura
+
+            echo "Resumo extraído:"
+            echo "$response" | jq -r '.response // .error'
           else
             echo "⚠️ Arquivo trivy-results.sarif não encontrado. Pulando etapa."
           fi
+
 
       - name: Enviar resultados Bandit para TinyLlama
         run: |
