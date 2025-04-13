@@ -1,10 +1,15 @@
 name: Analyze GitHub Security Findings
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - Dev
   pull_request:
-    branches: [main, Dev]
-
+    branches:
+      - main
+      - Dev
+      
 permissions:
   contents: read
   security-events: read  # necessário para acessar findings via API
@@ -18,18 +23,34 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
 
-      - name: Instalar Docker e dependências
+      - name: Remover versões conflitantes do Docker
         run: |
+          sudo apt-get remove --purge containerd containerd.io || true
           sudo apt-get update
-          sudo apt-get install -y docker.io jq curl
 
-      - name: Subir ambiente TinyLlama com Ollama
+      - name: Instalar Docker e Docker Compose
         run: |
-          docker run -d --name ollama -p 11434:11434 ollama/ollama
-          sleep 15  # tempo para subir a API
-          docker exec ollama ollama pull tinyllama
+          sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+          sudo sh -c "echo 'deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable' > /etc/apt/sources.list.d/docker.list"
+          sudo apt-get update
+          sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+          sudo curl -L "https://github.com/docker/compose/releases/download/$(curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r .tag_name)/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
 
-      - name: Baixar findings do GitHub Security
+      - name: Configurar Docker
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build Docker Image (caso necessário)
+        run: |
+          docker-compose -f docker-compose.yml build
+
+      - name: Iniciar Containers
+        run: |
+          docker-compose -f docker-compose.yml up -d
+          sudo docker exec ollama ollama pull tinyllama
+
+      - name: Baixar findings de segurança
         run: |
           mkdir -p findings
 
@@ -38,49 +59,59 @@ jobs:
             https://api.github.com/repos/${{ github.repository }}/code-scanning/alerts \
             -o findings/code-scanning.json
 
+          echo "Exibindo findings do Code Scanning..."
+          cat findings/code-scanning.json  # Exibe o conteúdo do arquivo baixado
+
           echo "🔐 Baixando Secret Scanning..."
           curl -s -H "Authorization: token ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}" \
             https://api.github.com/repos/${{ github.repository }}/secret-scanning/alerts \
             -o findings/secrets.json
+
+          echo "Exibindo findings do Secret Scanning..."
+          cat findings/secrets.json  # Exibe o conteúdo do arquivo baixado
 
           echo "📦 Baixando Dependabot..."
           curl -s -H "Authorization: token ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}" \
             https://api.github.com/repos/${{ github.repository }}/dependabot/alerts \
             -o findings/dependabot.json
 
-      - name: Analisar cada finding com TinyLlama
-        run: |
-          analyze_findings() {
-            local type="$1"
-            local file="findings/${type}.json"
+          echo "Exibindo findings do Dependabot..."
+          cat findings/dependabot.json  # Exibe o conteúdo do arquivo baixado
 
-            echo "🔎 Analisando findings de ${type}..."
-            count=$(jq length "$file")
 
-            if [ "$count" -eq 0 ]; then
-              echo "✅ Nenhum finding de ${type} encontrado."
-              return
-            fi
+        - name: Analisar cada finding com TinyLlama
+          run: |
+            analyze_findings() {
+              local type="$1"
+              local file="findings/${type}.json"
 
-            for i in $(seq 0 $(($count - 1))); do
-              finding=$(jq -c ".[$i]" "$file")
-              prompt=$(jq -Rn --arg data "$finding" --arg type "$type" \
-                '$type + " finding: " + $data')
+              echo "🔎 Analisando findings de ${type}..."
+              count=$(jq length "$file")
 
-              echo "📤 Enviando para análise..."
-              response=$(curl -s -X POST http://localhost:11434/api/generate \
-                -H "Content-Type: application/json" \
-                -d "{\"model\": \"tinyllama\", \"prompt\": $prompt, \"stream\": false}")
+              if [ "$count" -eq 0 ]; then
+                echo "✅ Nenhum finding de ${type} encontrado."
+                return
+              fi
 
-              echo "🧠 Resultado da IA (Finding $i):"
-              echo "$response" | jq -r '.response // .error'
-              echo "---"
-            done
-          }
+              for i in $(seq 0 $(($count - 1))); do
+                finding=$(jq -c ".[$i]" "$file")
+                prompt=$(jq -Rn --arg data "$finding" --arg type "$type" \
+                  '$type + " finding: " + $data')
 
-          analyze_findings "code-scanning"
-          analyze_findings "secrets"
-          analyze_findings "dependabot"
+                echo "📤 Enviando para análise..."
+                response=$(curl -s -X POST http://localhost:11434/api/generate \
+                  -H "Content-Type: application/json" \
+                  -d "{\"model\": \"tinyllama\", \"stream\": false, \"prompt\": $prompt}")
+
+                echo "🧠 Resultado da IA (Finding $i):"
+                echo "$response" | jq -r '.response // .error'
+                echo "---"
+              done
+            }
+
+            analyze_findings "code-scanning"
+            analyze_findings "secrets"
+            analyze_findings "dependabot"
 
       - name: Parar ambiente TinyLlama
         run: |
