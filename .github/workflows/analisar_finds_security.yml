@@ -125,25 +125,47 @@ jobs:
               if [ "$result" == "null" ] || [ "$result" == "erro" ]; then
                 echo "⚠️ Erro na resposta da IA: $response"
               else
+                echo "🔍 Exibindo conteúdo do PR Diff:"
+                cat pr.diff  # Exibe o conteúdo do diff para diagnóstico
                 echo "🧠 Resultado da IA: $result"
+                # Se estiver rodando num Pull Request, comente a resposta da IA
+                if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+                  comment_body="### 🤖 Análise Automática da TinyLlama
 
-                comment_body="### 🤖 TinyLlama Security Analysis
+                  **Finding #$number**  
+                  **Severidade:** $severity  
+                  **Caminho:** \`$location_path:$location_line\`  
 
-                **Finding #$number**  
-                **Severity:** $severity  
-                **File:** \`$location_path:$location_line\`  
+                  **Resultado da IA:**  
+                  $result
 
-                **AI Response:**  
-                $result
+                  [🔗 Ver finding no GitHub]($html_url)
+                  "
 
-                [🔗 View on GitHub]($html_url)"
+                  comment_body=$(cat <<EOF
+                  ### 🤖 Análise Automática da TinyLlama
 
-                curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-                  -H "Content-Type: application/json" \
-                  -X POST \
-                  -d "{\"body\": \"$comment_body\"}" \
-                  "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments"
-              fi
+                  **Finding #$number**  
+                  **Severidade:** $severity  
+                  **Caminho:** \`$location_path:$location_line\`  
+
+                  **Resultado da IA:**  
+                  $result
+
+                  [🔗 Ver finding no GitHub]($html_url)
+                  EOF
+                  )
+
+                  # Escapar com jq para evitar problemas de JSON malformado
+                  escaped_body=$(printf '%s' "$comment_body" | jq -Rs .)
+
+                  curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                      -H "Content-Type: application/json" \
+                      -X POST \
+                      -d "{\"body\": $escaped_body}" \
+                      "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments"
+
+              
             done
           }
 
