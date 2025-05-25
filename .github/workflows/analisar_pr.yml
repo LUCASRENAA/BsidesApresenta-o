@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   analyze-pr:
-    name: Analisar PR com TinyLlama
+    name: Analisar PR com IA
     runs-on: ubuntu-latest
 
     steps:
@@ -25,16 +25,16 @@ jobs:
       - name: Obter Diff do PR
         id: pr_diff
         run: |
-          # Baixar o diff do PR para uma variável
+          # Pega o diff entre o código base e o PR
           git diff ${{ github.event.pull_request.base.sha }} ${{ github.sha }} > pr.diff
           
-          # Exibir o diff para depuração
+          # Exibe o diff para depuração
           cat pr.diff
 
       - name: Preparar o Prompt para IA
         id: prepare_prompt
         run: |
-          # A IA analisará as modificações do PR
+          # Lê o diff do PR
           diff_content=$(cat pr.diff)
           prompt="Analisando o seguinte Pull Request:
 
@@ -43,55 +43,41 @@ Aqui estão as modificações feitas no PR:
 $diff_content
 \`\`\`
 
-Considerando as melhores práticas de segurança e qualidade de código, você pode sugerir melhorias ou identificar vulnerabilidades que precisam ser corrigidas?
-
-Por favor, forneça uma descrição do que pode ser melhorado e uma sugestão de código, se possível."
+Por favor, identifique qualquer vulnerabilidade de segurança ou melhoria de código necessária."
 
           # Escape o prompt para lidar com caracteres especiais
           escaped_prompt=$(jq -Rs <<< "$prompt")
-          echo "Prompt preparado para IA: $escaped_prompt"
-          
-          # Armazenar o prompt preparado para ser usado na próxima etapa
           echo "::set-output name=escaped_prompt::$escaped_prompt"
 
       - name: Enviar Prompt para IA e Obter Resposta
         id: ai_response
         run: |
-          # Usando a IA TinyLlama para analisar as modificações no PR
+          # Envia o prompt para a IA (TinyLlama ou outro modelo) e captura a resposta
           response=$(curl -s -X POST http://localhost:11399/api/generate \
             -H "Content-Type: application/json" \
             -d "{\"model\": \"tinyllama\", \"stream\": false, \"prompt\": \"${{ steps.prepare_prompt.outputs.escaped_prompt }}\"}")
 
           result=$(echo "$response" | jq -r '.response // .error')
-          echo "Resposta da IA: $result"
-
-          # Salvar a resposta para a próxima etapa
           echo "::set-output name=result::$result"
 
       - name: Comentar no PR com a Resposta da IA
         if: steps.ai_response.outputs.result != 'null' && steps.ai_response.outputs.result != 'erro'
         run: |
-          # Construir o comentário a ser postado no PR
+          # Comenta no PR com o resultado da IA
           comment_body="### 🤖 Análise Automática da IA
 
 **Resultado da Análise:**
 
 ${{ steps.ai_response.outputs.result }}
 
-Por favor, revise as alterações sugeridas e faça as correções necessárias no código.
-
 [🔗 Ver PR no GitHub](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/${{ github.event.pull_request.number }})"
 
-          # Escapar com jq para evitar problemas de JSON malformado
+          # Escapar o comentário para evitar problemas de JSON malformado
           escaped_body=$(printf '%s' "$comment_body" | jq -Rs .)
 
-          # Postar o comentário no PR
+          # Envia o comentário para o GitHub
           curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
               -H "Content-Type: application/json" \
               -X POST \
               -d "{\"body\": $escaped_body}" \
               "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments"
-        
-      - name: Parar Ambiente IA (se necessário)
-        run: |
-          docker stop ollama && docker rm ollama || true
