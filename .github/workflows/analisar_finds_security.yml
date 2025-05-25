@@ -93,9 +93,6 @@ jobs:
               finding=$(jq -r ".[$i]" "$file")
 
               number=$(echo "$finding" | jq -r '.number')
-              created_at=$(echo "$finding" | jq -r '.created_at')
-              updated_at=$(echo "$finding" | jq -r '.updated_at')
-              description=$(echo "$finding" | jq -r '.rule.description')
               severity=$(echo "$finding" | jq -r '.rule.severity')
               location_path=$(echo "$finding" | jq -r '.most_recent_instance.location.path')
               location_line=$(echo "$finding" | jq -r '.most_recent_instance.location.start_line')
@@ -103,12 +100,15 @@ jobs:
               html_url=$(echo "$finding" | jq -r '.html_url')
               help_uri=$(echo "$finding" | jq -r '.rule.help_uri')
 
+              # Verificar se as variáveis estão preenchidas corretamente
+              if [[ -z "$number" || -z "$severity" || -z "$location_path" || -z "$location_line" || -z "$message_text" || -z "$html_url" ]]; then
+                echo "⚠️ Dados incompletos no finding: $finding"
+                continue
+              fi
+
               formatted_prompt="A vulnerability was found in the repository. Below are the details:
 
               - Finding ID: $number
-              - Created At: $created_at
-              - Updated At: $updated_at
-              - Description: $description
               - Severity: $severity
               - File Path: $location_path
               - Line Number: $location_line
@@ -127,28 +127,28 @@ jobs:
                 -H "Content-Type: application/json" \
                 -d "{\"model\": \"tinyllama\", \"stream\": false, \"prompt\": $escaped_prompt}" || echo "erro")
 
-              result=$(echo "$response" | jq -r '.response // .error')
+              result=$(echo "$response" | jq -r '.response // "No result from AI"')
 
               if [ "$result" == "null" ] || [ "$result" == "erro" ]; then
                 echo "⚠️ Erro na resposta da IA: $response"
+                continue
               else
                 echo "🧠 Resultado da IA: $result"
                 
-                # Se o evento for pull_request, atualiza a descrição do Security Advisory no GitHub
                 if [[ "${{ github.event_name }}" == "pull_request" ]]; then
                   advisory_body="### 🤖 Análise Automática da TinyLlama
 
-                **Finding #$number**  
-                **Severidade:** $severity  
-                **Caminho:** \`$location_path:$location_line\`  
+                  **Finding #$number**  
+                  **Severidade:** $severity  
+                  **Caminho:** \`$location_path:$location_line\`  
 
-                **Resultado da IA:**  
-                $result
+                  **Resultado da IA:**  
+                  $result
 
-                [🔗 Ver finding no GitHub]($html_url)
-                "
+                  [🔗 Ver finding no GitHub]($html_url)
+                  "
 
-                  # Escapar o corpo do advisory para evitar problemas com caracteres especiais
+                  # Escape do corpo do advisory
                   escaped_advisory_body=$(printf '%s' "$advisory_body" | jq -Rs .)
 
                   # Atualizar a descrição do Security Advisory no GitHub
