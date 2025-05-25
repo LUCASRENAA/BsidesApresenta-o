@@ -7,7 +7,12 @@ on:
       - Dev
   pull_request:
     branches:
-      - main1
+      - main
+      - Dev
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+    branches:
+      - main
       - Dev
 
 permissions:
@@ -113,10 +118,8 @@ jobs:
               For reference, here is the rule documentation: $help_uri  
               GitHub Finding Link: $html_url"
 
-
               echo "🔍 Enviando prompt para o TinyLlama: $formatted_prompt"
               # Escapar o prompt usando jq
-              # Escapar o prompt corretamente como string
               escaped_prompt=$(jq -Rs <<< "$formatted_prompt")
 
               response=$(curl -s -X POST http://localhost:11399/api/generate \
@@ -129,27 +132,31 @@ jobs:
                 echo "⚠️ Erro na resposta da IA: $response"
               else
                 echo "🧠 Resultado da IA: $result"
-                # Se estiver rodando num Pull Request, comente a resposta da IA
-              if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-                comment_body="### 🤖 Análise Automática da TinyLlama
+                
+                # Se o evento for pull_request, comente no PR com a resposta da IA
+                if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+                  comment_body="### 🤖 Análise Automática da TinyLlama
 
-              **Finding #$number**  
-              **Severidade:** $severity  
-              **Caminho:** \`$location_path:$location_line\`  
+                **Finding #$number**  
+                **Severidade:** $severity  
+                **Caminho:** \`$location_path:$location_line\`  
 
-              **Resultado da IA:**  
-              $result
+                **Resultado da IA:**  
+                $result
 
-              [🔗 Ver finding no GitHub]($html_url)
-              "
+                [🔗 Ver finding no GitHub]($html_url)
+                "
 
-                curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-                    -H "Content-Type: application/json" \
-                    -X POST \
-                    -d "{\"body\": \"$comment_body\"}" \
-                    "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments"
-              fi
+                  # Escapar o corpo do comentário para evitar problemas com caracteres especiais
+                  escaped_body=$(printf '%s' "$comment_body" | jq -Rs .)
 
+                  # Enviar o comentário no PR
+                  curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                      -H "Content-Type: application/json" \
+                      -X POST \
+                      -d "{\"body\": $escaped_body}" \
+                      "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments"
+                fi
               fi
 
             done
