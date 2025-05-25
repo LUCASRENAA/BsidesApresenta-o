@@ -105,6 +105,9 @@ jobs:
           # Extraímos o resultado da IA ou erro
           result=$(echo "$response" | jq -r '.response // .error')
 
+          # Exibe a resposta da IA no log
+          echo "🧠 Resposta da IA: $result"
+
           # Definindo o resultado para a próxima etapa
           echo "result=$result" >> $GITHUB_ENV
 
