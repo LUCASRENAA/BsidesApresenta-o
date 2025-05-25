@@ -134,9 +134,9 @@ jobs:
               else
                 echo "🧠 Resultado da IA: $result"
                 
-                # Se o evento for pull_request, comente no PR com a resposta da IA
+                # Se o evento for pull_request, atualiza a descrição do Security Advisory no GitHub
                 if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-                  comment_body="### 🤖 Análise Automática da TinyLlama
+                  advisory_body="### 🤖 Análise Automática da TinyLlama
 
                 **Finding #$number**  
                 **Severidade:** $severity  
@@ -148,18 +148,17 @@ jobs:
                 [🔗 Ver finding no GitHub]($html_url)
                 "
 
-                  # Escapar o corpo do comentário para evitar problemas com caracteres especiais
-                  escaped_body=$(printf '%s' "$comment_body" | jq -Rs .)
+                  # Escapar o corpo do advisory para evitar problemas com caracteres especiais
+                  escaped_advisory_body=$(printf '%s' "$advisory_body" | jq -Rs .)
 
-                  # Enviar o comentário no PR
+                  # Atualizar a descrição do Security Advisory no GitHub
                   curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
                       -H "Content-Type: application/json" \
-                      -X POST \
-                      -d "{\"body\": $escaped_body}" \
-                      "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments"
+                      -X PATCH \
+                      -d "{\"description\": $escaped_advisory_body}" \
+                      "https://api.github.com/repos/${{ github.repository }}/security-advisories/$number"
                 fi
               fi
-
             done
           }
 
