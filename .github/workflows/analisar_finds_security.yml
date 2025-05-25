@@ -172,4 +172,3 @@ jobs:
       - name: Parar ambiente TinyLlama
         run: |
           docker stop ollama && docker rm ollama
-
