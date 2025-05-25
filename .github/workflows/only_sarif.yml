@@ -7,7 +7,7 @@ on:
       - Dev
   pull_request:
     branches:
-      - main
+      - main1
       - Dev
 
 permissions:

@@ -40,12 +40,12 @@ jobs:
           # Cria o prompt para análise do PR
           prompt="Analisando o seguinte Pull Request:
 
-Aqui estão as modificações feitas no PR:
-\`\`\`diff
-$diff_content
-\`\`\`
+          Aqui estão as modificações feitas no PR:
+          \`\`\`diff
+          $diff_content
+          \`\`\`
 
-Por favor, identifique qualquer vulnerabilidade de segurança ou melhoria de código necessária. Se possível, sugira uma correção."
+          Por favor, identifique qualquer vulnerabilidade de segurança ou melhoria de código necessária. Se possível, sugira uma correção."
 
           # Escape o prompt para lidar com caracteres especiais
           escaped_prompt=$(jq -Rs <<< "$prompt")
@@ -71,13 +71,13 @@ Por favor, identifique qualquer vulnerabilidade de segurança ou melhoria de có
           # Comenta no PR com o resultado da IA
           comment_body="### 🤖 Análise Automática da IA
 
-**Resultado da Análise:**
+          **Resultado da Análise:**
 
-${{ steps.ai_response.outputs.result }}
+          ${{ steps.ai_response.outputs.result }}
 
-Por favor, revise as sugestões e implemente as correções necessárias.
+          Por favor, revise as sugestões e implemente as correções necessárias.
 
-[🔗 Ver PR no GitHub](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/${{ github.event.pull_request.number }})"
+          [🔗 Ver PR no GitHub](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/${{ github.event.pull_request.number }})"
 
           # Escapar o comentário para evitar problemas de JSON malformado
           escaped_body=$(printf '%s' "$comment_body" | jq -Rs .)
