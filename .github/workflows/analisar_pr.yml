@@ -1,6 +1,5 @@
 name: Analyze Pull Request with AI
 
-
 on:
   push:
     branches:
@@ -16,9 +15,6 @@ on:
       - main
       - Dev
 
-
-
-  
 permissions:
   contents: read
   pull-requests: write
@@ -61,31 +57,36 @@ jobs:
 
           # Escape o prompt para lidar com caracteres especiais
           escaped_prompt=$(jq -Rs <<< "$prompt")
-          echo "::set-output name=escaped_prompt::$escaped_prompt"
+          
+          # Salva o prompt no ambiente do GitHub Actions
+          echo "escaped_prompt=$escaped_prompt" >> $GITHUB_ENV
 
       - name: Enviar Prompt para IA e Obter Resposta
         id: ai_response
         run: |
+          # Recupera o prompt escapado do ambiente
+          escaped_prompt=$ESCAPED_PROMPT
+          
           # Envia o prompt para a IA (TinyLlama ou outro modelo) e captura a resposta
           response=$(curl -s -X POST http://localhost:11399/api/generate \
             -H "Content-Type: application/json" \
-            -d "{\"model\": \"tinyllama\", \"stream\": false, \"prompt\": \"${{ steps.prepare_prompt.outputs.escaped_prompt }}\"}")
+            -d "{\"model\": \"tinyllama\", \"stream\": false, \"prompt\": \"$escaped_prompt\"}")
 
           # Extraímos o resultado da IA ou erro
           result=$(echo "$response" | jq -r '.response // .error')
 
           # Definindo o resultado para a próxima etapa
-          echo "::set-output name=result::$result"
+          echo "result=$result" >> $GITHUB_ENV
 
       - name: Comentar no PR com a Resposta da IA
-        if: steps.ai_response.outputs.result != 'null' && steps.ai_response.outputs.result != 'erro'
+        if: env.result != 'null' && env.result != 'erro'
         run: |
           # Comenta no PR com o resultado da IA
           comment_body="### 🤖 Análise Automática da IA
 
           **Resultado da Análise:**
 
-          ${{ steps.ai_response.outputs.result }}
+          ${{ env.result }}
 
           Por favor, revise as sugestões e implemente as correções necessárias.
 
