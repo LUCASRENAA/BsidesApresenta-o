@@ -71,11 +71,12 @@ Por favor, forneça uma descrição do que pode ser melhorado e uma sugestão de
       - name: Comentar no PR com a Resposta da IA
         if: steps.ai_response.outputs.result != 'null' && steps.ai_response.outputs.result != 'erro'
         run: |
+          # Construir o comentário a ser postado no PR
           comment_body="### 🤖 Análise Automática da IA
 
 **Resultado da Análise:**
 
-$result
+${{ steps.ai_response.outputs.result }}
 
 Por favor, revise as alterações sugeridas e faça as correções necessárias no código.
 
@@ -84,6 +85,7 @@ Por favor, revise as alterações sugeridas e faça as correções necessárias 
           # Escapar com jq para evitar problemas de JSON malformado
           escaped_body=$(printf '%s' "$comment_body" | jq -Rs .)
 
+          # Postar o comentário no PR
           curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
               -H "Content-Type: application/json" \
               -X POST \
