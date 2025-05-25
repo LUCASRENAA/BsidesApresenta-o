@@ -36,6 +36,8 @@ jobs:
         run: |
           # Lê o diff do PR
           diff_content=$(cat pr.diff)
+
+          # Cria o prompt para análise do PR
           prompt="Analisando o seguinte Pull Request:
 
 Aqui estão as modificações feitas no PR:
@@ -43,7 +45,7 @@ Aqui estão as modificações feitas no PR:
 $diff_content
 \`\`\`
 
-Por favor, identifique qualquer vulnerabilidade de segurança ou melhoria de código necessária."
+Por favor, identifique qualquer vulnerabilidade de segurança ou melhoria de código necessária. Se possível, sugira uma correção."
 
           # Escape o prompt para lidar com caracteres especiais
           escaped_prompt=$(jq -Rs <<< "$prompt")
@@ -57,7 +59,10 @@ Por favor, identifique qualquer vulnerabilidade de segurança ou melhoria de có
             -H "Content-Type: application/json" \
             -d "{\"model\": \"tinyllama\", \"stream\": false, \"prompt\": \"${{ steps.prepare_prompt.outputs.escaped_prompt }}\"}")
 
+          # Extraímos o resultado da IA ou erro
           result=$(echo "$response" | jq -r '.response // .error')
+
+          # Definindo o resultado para a próxima etapa
           echo "::set-output name=result::$result"
 
       - name: Comentar no PR com a Resposta da IA
@@ -70,6 +75,8 @@ Por favor, identifique qualquer vulnerabilidade de segurança ou melhoria de có
 
 ${{ steps.ai_response.outputs.result }}
 
+Por favor, revise as sugestões e implemente as correções necessárias.
+
 [🔗 Ver PR no GitHub](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/${{ github.event.pull_request.number }})"
 
           # Escapar o comentário para evitar problemas de JSON malformado
@@ -81,3 +88,8 @@ ${{ steps.ai_response.outputs.result }}
               -X POST \
               -d "{\"body\": $escaped_body}" \
               "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments"
+
+      - name: Parar Ambiente IA (se necessário)
+        run: |
+          # Parar o container da IA (TinyLlama)
+          docker stop ollama && docker rm ollama || true
