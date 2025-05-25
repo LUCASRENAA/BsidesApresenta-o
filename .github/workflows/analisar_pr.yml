@@ -80,7 +80,10 @@ jobs:
           $diff_content
           \`\`\`
 
-          Por favor, identifique qualquer vulnerabilidade de segurança ou melhoria de código necessária. Se possível, sugira uma correção."
+          Por favor, analise o código e:
+          1. Identifique vulnerabilidades de segurança (como SQL Injection, XSS, etc.)
+          2. Sugira melhorias no código (como refatoração, performance, ou legibilidade)
+          3. Se possível, forneça exemplos de correção para os problemas encontrados."
 
           # Escape o prompt para lidar com caracteres especiais
           escaped_prompt=$(jq -Rs <<< "$prompt")
