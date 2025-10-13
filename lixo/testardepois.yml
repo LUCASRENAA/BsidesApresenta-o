@@ -5,10 +5,6 @@ on:
     branches:
       - main
       - Dev
-  pull_request:
-    branches:
-      - main
-      - Dev
   pull_request_target:
     types: [opened, reopened, synchronize]
     branches:
@@ -17,8 +13,8 @@ on:
 
 permissions:
   contents: read
-  security-events: read
   pull-requests: write
+  security-events: read
 
 jobs:
   analyze-findings:
@@ -26,8 +22,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repositório com segurança
         uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
 
       - name: Remover versões conflitantes do Docker
         run: |
@@ -60,27 +59,23 @@ jobs:
         run: |
           mkdir -p findings
 
-          echo "🔍 Baixando Code Scanning..."
-          curl -s -H "Authorization: token ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}" \
+          curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             https://api.github.com/repos/${{ github.repository }}/code-scanning/alerts \
             -o findings/code-scanning.json
 
-          echo "🔐 Baixando Secret Scanning..."
-          curl -s -H "Authorization: token ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}" \
+          curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             https://api.github.com/repos/${{ github.repository }}/secret-scanning/alerts \
             -o findings/secrets.json || echo "Erro ao baixar Secret Scanning"
 
-          echo "📦 Baixando Dependabot..."
-          curl -s -H "Authorization: token ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}" \
+          curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             https://api.github.com/repos/${{ github.repository }}/dependabot/alerts \
             -o findings/dependabot.json || echo "Erro ao baixar Dependabot"
 
-      - name: Analisar cada finding com TinyLlama
+      - name: Analisar findings com TinyLlama
         run: |
           analyze_findings() {
             local type="$1"
             local file="findings/${type}.json"
-
             echo "🔎 Analisando findings de ${type}..."
             count=$(jq length "$file")
 
@@ -93,6 +88,9 @@ jobs:
               finding=$(jq -r ".[$i]" "$file")
 
               number=$(echo "$finding" | jq -r '.number')
+              created_at=$(echo "$finding" | jq -r '.created_at')
+              updated_at=$(echo "$finding" | jq -r '.updated_at')
+              description=$(echo "$finding" | jq -r '.rule.description')
               severity=$(echo "$finding" | jq -r '.rule.severity')
               location_path=$(echo "$finding" | jq -r '.most_recent_instance.location.path')
               location_line=$(echo "$finding" | jq -r '.most_recent_instance.location.start_line')
@@ -100,74 +98,106 @@ jobs:
               html_url=$(echo "$finding" | jq -r '.html_url')
               help_uri=$(echo "$finding" | jq -r '.rule.help_uri')
 
-              # Verificar se as variáveis estão preenchidas corretamente
-              if [[ -z "$number" || -z "$severity" || -z "$location_path" || -z "$location_line" || -z "$message_text" || -z "$html_url" ]]; then
-                echo "⚠️ Dados incompletos no finding: $finding"
-                continue
+              # Extrair trecho de código (20 linhas antes e depois da linha de interesse)
+              start_line=$((location_line - 20))
+              end_line=$((location_line + 20))
+
+              # Garantir que não haja números negativos
+              if [ "$start_line" -lt 1 ]; then start_line=1; fi
+
+              if [ -f "$location_path" ]; then
+                code_snippet=$(sed -n "${start_line},${end_line}p" "$location_path")
+              else
+                code_snippet="⚠️ Arquivo $location_path não encontrado no repositório clonado."
               fi
 
-              formatted_prompt="A vulnerability was found in the repository. Below are the details:
+              # Montar o prompt com mais contexto
+              prompt="A vulnerability was found in the repository. Below are the details:
 
-              - Finding ID: $number
-              - Severity: $severity
-              - File Path: $location_path
-              - Line Number: $location_line
-              - Message: $message_text
+- Finding ID: $number
+- Created At: $created_at
+- Updated At: $updated_at
+- Description: $description
+- Severity: $severity
+- File Path: $location_path
+- Line Number: $location_line
+- Message: $message_text
 
-              Do you consider this a false positive? Justify your answer briefly.
+Here is the code context:
+\`\`\`
+$code_snippet
+\`\`\`
 
-              For reference, here is the rule documentation: $help_uri  
-              GitHub Finding Link: $html_url"
+Do you consider this a false positive? If not, can you suggest a possible code correction or mitigation strategy for this vulnerability?
 
-              echo "🔍 Enviando prompt para o TinyLlama: $formatted_prompt"
-              # Escapar o prompt usando jq
-              escaped_prompt=$(jq -Rs <<< "$formatted_prompt")
+For reference, here is the rule documentation: $help_uri  
+GitHub Finding Link: $html_url"
+
+              # Escape the prompt to handle special characters
+              escaped_prompt=$(jq -Rs <<< "$prompt")
 
               response=$(curl -s -X POST http://localhost:11399/api/generate \
                 -H "Content-Type: application/json" \
                 -d "{\"model\": \"tinyllama\", \"stream\": false, \"prompt\": $escaped_prompt}" || echo "erro")
 
-              result=$(echo "$response" | jq -r '.response // "No result from AI"')
+              result=$(echo "$response" | jq -r '.response // .error')
 
               if [ "$result" == "null" ] || [ "$result" == "erro" ]; then
                 echo "⚠️ Erro na resposta da IA: $response"
-                continue
               else
+                echo "🔍 Exibindo conteúdo do PR Diff:"
+                cat pr.diff  # Exibe o conteúdo do diff para diagnóstico
                 echo "🧠 Resultado da IA: $result"
-                
+
+                # Se estiver rodando num Pull Request, comente a resposta da IA
                 if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-                  advisory_body="### 🤖 Análise Automática da TinyLlama
+                  # Verificar se a resposta contém sugestão de correção
+                  if [[ "$result" =~ "suggestion" || "$result" =~ "fix" || "$result" =~ "correct" ]]; then
+                    comment_body="### 🤖 Análise Automática da TinyLlama
 
-                  **Finding #$number**  
-                  **Severidade:** $severity  
-                  **Caminho:** \`$location_path:$location_line\`  
+                    **Finding #$number**  
+                    **Severidade:** $severity  
+                    **Caminho:** \`$location_path:$location_line\`  
 
-                  **Resultado da IA:**  
-                  $result
+                    **Resultado da IA:**  
+                    $result
 
-                  [🔗 Ver finding no GitHub]($html_url)
-                  "
+                    **Sugestão de Correção:**  
+                    Aqui está a sugestão da IA para corrigir o problema:
+                    \`\`\`
+                    $result
+                    \`\`\`
 
-                  # Escape do corpo do advisory
-                  escaped_advisory_body=$(printf '%s' "$advisory_body" | jq -Rs .)
+                    [🔗 Ver finding no GitHub]($html_url)"
+                  else
+                    comment_body="### 🤖 Análise Automática da TinyLlama
 
-                  # Atualizar a descrição do Security Advisory no GitHub
+                    **Finding #$number**  
+                    **Severidade:** $severity  
+                    **Caminho:** \`$location_path:$location_line\`  
+
+                    **Resultado da IA:**  
+                    $result
+
+                    [🔗 Ver finding no GitHub]($html_url)"
+                  fi
+
+                  # Escapar com jq para evitar problemas de JSON malformado
+                  escaped_body=$(printf '%s' "$comment_body" | jq -Rs .)
+
                   curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
                       -H "Content-Type: application/json" \
-                      -X PATCH \
-                      -d "{\"description\": $escaped_advisory_body}" \
-                      "https://api.github.com/repos/${{ github.repository }}/security-advisories/$number"
+                      -X POST \
+                      -d "{\"body\": $escaped_body}" \
+                      "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments"
                 fi
               fi
             done
           }
 
           analyze_findings "code-scanning"
-          echo "🧪 Tentando analisar secrets.json..."
-          ( analyze_findings "secrets" ) || echo "⚠️ Erro ao analisar findings de secrets ou arquivo inválido."
-
-          echo "🧪 Tentando analisar dependabot.json..."
-          ( analyze_findings "dependabot" ) || echo "⚠️ Erro ao analisar findings de dependabot ou arquivo inválido."
+          ( analyze_findings "secrets" ) || echo "⚠️ Erro ao analisar secrets.json"
+          ( analyze_findings "dependabot" ) || echo "⚠️ Erro ao analisar dependabot.json"
 
       - name: Parar ambiente TinyLlama
         run: |
